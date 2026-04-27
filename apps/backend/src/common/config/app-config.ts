@@ -38,7 +38,7 @@ function splitList(value: string | undefined): string[] {
 
 export function loadAppConfig(): AppConfig {
   const appDir = path.dirname(fileURLToPath(import.meta.url));
-  const backendRootDir = path.resolve(appDir, "../..");
+  const backendRootDir = path.resolve(appDir, "../../..");
   const resolveBackendPath = (value: string | undefined, fallback: string): string => {
     const target = value ?? fallback;
     return path.isAbsolute(target) ? target : path.resolve(backendRootDir, target);

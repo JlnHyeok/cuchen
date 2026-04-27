@@ -45,6 +45,7 @@ Thumbs.db
 outputs/
 artifacts/
 apps/backend/generated/inbox/
+apps/backend/src/generated/
 
 # Local service data
 minio-data/
