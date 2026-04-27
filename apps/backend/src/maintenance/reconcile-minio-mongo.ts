@@ -23,6 +23,7 @@ interface ReconcileStats {
 interface RepairUpdate {
   filter: { imageId: string };
   update: Record<string, unknown>;
+  upsert?: boolean;
 }
 
 const BATCH_SIZE = 1000;
@@ -37,35 +38,42 @@ async function main(): Promise<void> {
   await CatalogModel.createCollection();
   await CatalogModel.syncIndexes();
 
-  const [objects, mongoDocuments] = await Promise.all([
-    listImageObjects(client, bucketName),
-    CatalogModel.find({ bucket: bucketName }).lean().exec()
-  ]);
-
+  const objects = await listImageObjects(client, bucketName);
   const minioMap = new Map(objects.map((object) => [buildImageId(object.name), object]));
+  const mongoDocuments = await CatalogModel.find({
+    $or: [{ bucket: bucketName }, { imageId: { $in: [...minioMap.keys()] } }]
+  })
+    .lean()
+    .exec();
   const mongoMap = new Map(mongoDocuments.map((document) => [document.imageId, document]));
+  const bucketDocuments = mongoDocuments.filter((document) => document.bucket === bucketName);
 
-  const insertDocs = [];
   const repairOperations: Array<{ updateOne: RepairUpdate }> = [];
-  let repaired = 0;
+  let inserted = 0;
   let missingInMinio = 0;
 
   for (const object of objects) {
     const imageId = buildImageId(object.name);
     const existing = mongoMap.get(imageId);
     if (!existing) {
-      insertDocs.push(buildCatalogDocument(bucketName, object));
+      repairOperations.push({
+        updateOne: {
+          filter: { imageId },
+          update: { $setOnInsert: buildCatalogDocument(bucketName, object) },
+          upsert: true
+        }
+      });
+      inserted += 1;
       continue;
     }
 
     const updates = buildRepairUpdate(existing, bucketName, object);
     if (updates) {
       repairOperations.push({ updateOne: updates });
-      repaired += 1;
     }
   }
 
-  for (const document of mongoDocuments) {
+  for (const document of bucketDocuments) {
     if (!minioMap.has(document.imageId)) {
       missingInMinio += 1;
       repairOperations.push({
@@ -83,22 +91,18 @@ async function main(): Promise<void> {
     }
   }
 
-  if (insertDocs.length > 0) {
-    for (const chunk of chunkArray(insertDocs, BATCH_SIZE)) {
-      await CatalogModel.insertMany(chunk, { ordered: true });
-    }
-  }
-
+  let repaired = 0;
   if (repairOperations.length > 0) {
     for (const chunk of chunkArray(repairOperations, BATCH_SIZE)) {
-      await CatalogModel.bulkWrite(chunk as any, { ordered: false });
+      const result = await CatalogModel.bulkWrite(chunk as any, { ordered: false });
+      repaired += result.modifiedCount;
     }
   }
 
   const stats: ReconcileStats = {
     minioObjects: objects.length,
-    mongoDocuments: mongoDocuments.length,
-    inserted: insertDocs.length,
+    mongoDocuments: bucketDocuments.length,
+    inserted,
     repaired,
     missingInMinio
   };
@@ -163,23 +167,38 @@ function buildCatalogDocument(bucketName: string, object: MinioListObject) {
 }
 
 function buildRepairUpdate(
-  document: { syncStatus?: string; errorMessage?: string; updatedAt?: string },
+  document: {
+    bucket?: string;
+    imageKey?: string;
+    thumbnailKey?: string;
+    fileName?: string;
+    fileExt?: string;
+    sourcePath?: string;
+    syncStatus?: string;
+    errorMessage?: string;
+    updatedAt?: string;
+  },
   bucketName: string,
   object: MinioListObject
 ): RepairUpdate | null {
   const imageId = buildImageId(object.name);
   const nextStatus = document.syncStatus === "synced" ? null : "synced";
-  if (!nextStatus && !document.errorMessage) {
-    return null;
-  }
-
-  const $set: Record<string, unknown> = {
+  const nextFields = {
     bucket: bucketName,
     imageKey: object.name,
     thumbnailKey: buildThumbnailKey(imageId),
     fileName: stripExtension(pathBaseName(object.name)),
     fileExt: normalizeExt(pathExtName(object.name).slice(1).toLowerCase()),
-    sourcePath: object.name,
+    sourcePath: object.name
+  };
+  const hasCoreMismatch = Object.entries(nextFields).some(([key, value]) => document[key as keyof typeof document] !== value);
+
+  if (!nextStatus && !document.errorMessage && !hasCoreMismatch) {
+    return null;
+  }
+
+  const $set: Record<string, unknown> = {
+    ...nextFields,
     updatedAt: new Date().toISOString()
   };
 
