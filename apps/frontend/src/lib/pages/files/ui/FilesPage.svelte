@@ -48,7 +48,6 @@
   let previewRequestSequence = 0;
   let originalViewerOpen = false;
   let originalViewerFile: FileListItem | null = null;
-  let originalViewerPreviewUrl = '';
   let originalViewerBlobPromise: Promise<Blob> | null = null;
   const originalBlobCache = new Map<string, Blob>();
   const originalBlobRequests = new Map<string, Promise<Blob>>();
@@ -245,9 +244,7 @@
   }
 
   function openOriginalViewer(file: FileListItem): void {
-    const previewItem = previewItems.find((item) => item.file.id === file.id);
     originalViewerFile = file;
-    originalViewerPreviewUrl = previewItem?.imageUrl ?? '';
     originalViewerBlobPromise = getCachedOriginalBlob(file);
     originalViewerOpen = true;
   }
@@ -255,7 +252,6 @@
   function closeOriginalViewer(): void {
     originalViewerOpen = false;
     originalViewerFile = null;
-    originalViewerPreviewUrl = '';
     originalViewerBlobPromise = null;
   }
 
@@ -382,7 +378,6 @@
   <OriginalImageViewer
     open={originalViewerOpen}
     file={originalViewerFile}
-    previewUrl={originalViewerPreviewUrl}
     originalBlobPromise={originalViewerBlobPromise}
     onClose={closeOriginalViewer}
   />

@@ -7,7 +7,6 @@
 
   export let open = false;
   export let file: FileListItem | null = null;
-  export let previewUrl = '';
   export let originalBlobPromise: Promise<Blob> | null = null;
   export let onClose: () => void = () => {};
 
@@ -31,7 +30,6 @@
   $: divLabel = file ? formatDiv(file.div) : '';
   $: title = file ? `${file.productId} ${divLabel}` : '원본 이미지';
   $: imageStyle = `transform: translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) scale(${scale});`;
-  $: visibleImageUrl = originalImageUrl || previewUrl;
 
   function formatDiv(value: string): string {
     if (value === 'top') return '상단 원본';
@@ -71,7 +69,7 @@
 
     fitScale = Math.min(6, Math.max(0.05, Math.min(widthScale, heightScale)));
     resetView();
-    fittedImageUrl = visibleImageUrl;
+    fittedImageUrl = originalImageUrl;
     imageReady = true;
   }
 
@@ -132,7 +130,7 @@
   }
 
   function startDrag(event: PointerEvent): void {
-    if (!visibleImageUrl) return;
+    if (!originalImageUrl) return;
     dragging = true;
     lastPointerX = event.clientX;
     lastPointerY = event.clientY;
@@ -188,7 +186,7 @@
     void focusViewer();
   }
 
-  $: if (visibleImageUrl && visibleImageUrl !== fittedImageUrl) {
+  $: if (originalImageUrl && originalImageUrl !== fittedImageUrl) {
     imageReady = false;
   }
 
@@ -244,17 +242,17 @@
         on:pointercancel={stopDrag}
         on:dblclick={resetView}
       >
-        {#if loading && !visibleImageUrl}
+        {#if loading && !originalImageUrl}
           <div class="original-viewer-status">
             <span class="initial-loading-spinner"></span>
             <p>원본 이미지를 불러오는 중입니다.</p>
           </div>
-        {:else if error && !visibleImageUrl}
+        {:else if error && !originalImageUrl}
           <p class="original-viewer-error">{error}</p>
-        {:else if visibleImageUrl}
+        {:else if originalImageUrl}
           <img
             bind:this={imageElement}
-            src={visibleImageUrl}
+            src={originalImageUrl}
             alt={`${file.productId} ${divLabel} 원본`}
             style={imageStyle}
             class:fitting={!imageReady}
