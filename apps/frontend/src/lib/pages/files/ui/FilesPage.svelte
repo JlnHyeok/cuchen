@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { getFilterOptions, getPreviewImageBlob, getProductFiles, listFiles } from '@entities/file/api';
+  import { getFilterOptions, getImageBlob, getPreviewImageBlob, getProductFiles, listFiles } from '@entities/file/api';
   import type { FileListItem, FileListQuery, FilterOptions, PageResult } from '@entities/file/model';
   import { saveFileToDisk, saveSelectedFilesToDisk } from '@features/file-download/model/saveFileToDisk';
   import FileFilters from '@features/file-filter/ui/FileFilters.svelte';
   import ImagePreviewModal from '@features/image-preview/ui/ImagePreviewModal.svelte';
+  import OriginalImageViewer from '@features/image-preview/ui/OriginalImageViewer.svelte';
   import FileTable from '@widgets/file-table/ui/FileTable.svelte';
   import Pagination from '@widgets/file-table/ui/Pagination.svelte';
   import { getErrorMessage } from '@shared/lib/errors';
@@ -25,6 +26,7 @@
     totalData: 0,
     totalPages: 0
   };
+  const maxOriginalBlobCacheSize = 8;
   const pageSizeOptions = [10, 20, 50];
 
   let filters: FilterValues = {};
@@ -44,6 +46,12 @@
   let previewLoading = false;
   let previewError = '';
   let previewRequestSequence = 0;
+  let originalViewerOpen = false;
+  let originalViewerFile: FileListItem | null = null;
+  let originalViewerPreviewUrl = '';
+  let originalViewerBlobPromise: Promise<Blob> | null = null;
+  const originalBlobCache = new Map<string, Blob>();
+  const originalBlobRequests = new Map<string, Promise<Blob>>();
 
   $: selectedIdSet = new Set(selectedIds);
   $: currentPageIds = pageResult.items.map((item) => item.id);
@@ -197,6 +205,58 @@
     previewLoading = false;
     revokePreviewUrls();
     previewItems = [];
+    closeOriginalViewer();
+  }
+
+  function getCachedOriginalBlob(file: FileListItem): Promise<Blob> {
+    const cachedBlob = originalBlobCache.get(file.id);
+    if (cachedBlob) {
+      return Promise.resolve(cachedBlob);
+    }
+
+    const pendingRequest = originalBlobRequests.get(file.id);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    const request = getImageBlob(file.id)
+      .then((blob) => {
+        originalBlobCache.set(file.id, blob);
+        if (originalBlobCache.size > maxOriginalBlobCacheSize) {
+          const oldestFileId = originalBlobCache.keys().next().value;
+          if (oldestFileId) {
+            originalBlobCache.delete(oldestFileId);
+          }
+        }
+        return blob;
+      })
+      .finally(() => {
+        originalBlobRequests.delete(file.id);
+      });
+
+    originalBlobRequests.set(file.id, request);
+    return request;
+  }
+
+  function prefetchOriginal(file: FileListItem): void {
+    void getCachedOriginalBlob(file).catch(() => {
+      originalBlobCache.delete(file.id);
+    });
+  }
+
+  function openOriginalViewer(file: FileListItem): void {
+    const previewItem = previewItems.find((item) => item.file.id === file.id);
+    originalViewerFile = file;
+    originalViewerPreviewUrl = previewItem?.imageUrl ?? '';
+    originalViewerBlobPromise = getCachedOriginalBlob(file);
+    originalViewerOpen = true;
+  }
+
+  function closeOriginalViewer(): void {
+    originalViewerOpen = false;
+    originalViewerFile = null;
+    originalViewerPreviewUrl = '';
+    originalViewerBlobPromise = null;
   }
 
   async function download(file: FileListItem): Promise<void> {
@@ -315,5 +375,15 @@
     loading={previewLoading}
     error={previewError}
     onClose={closePreview}
+    onOpenOriginal={openOriginalViewer}
+    onPrefetchOriginal={prefetchOriginal}
+  />
+
+  <OriginalImageViewer
+    open={originalViewerOpen}
+    file={originalViewerFile}
+    previewUrl={originalViewerPreviewUrl}
+    originalBlobPromise={originalViewerBlobPromise}
+    onClose={closeOriginalViewer}
   />
 </main>

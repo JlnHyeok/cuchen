@@ -15,6 +15,8 @@
   export let loading = false;
   export let error = '';
   export let onClose: () => void = () => {};
+  export let onOpenOriginal: (file: FileListItem) => void = () => {};
+  export let onPrefetchOriginal: (file: FileListItem) => void = () => {};
 
   function formatDiv(value: string): string {
     if (value === 'top') return '상단 원본';
@@ -68,7 +70,16 @@
 
                 <div class="detail-image-shell">
                   {#if item.imageUrl}
-                    <img class="detail-image" src={item.imageUrl} alt={`${item.file.productId} ${formatDiv(item.file.div)} 미리보기`} />
+                    <button
+                      class="detail-image-button"
+                      type="button"
+                      aria-label={`${formatDiv(item.file.div)} 원본 보기`}
+                      on:click={() => onOpenOriginal(item.file)}
+                      on:focus={() => onPrefetchOriginal(item.file)}
+                      on:mouseenter={() => onPrefetchOriginal(item.file)}
+                    >
+                      <img class="detail-image" src={item.imageUrl} alt={`${item.file.productId} ${formatDiv(item.file.div)} 미리보기`} />
+                    </button>
                   {:else if item.imageError}
                     <div class="detail-image-placeholder detail-image-error">{item.imageError}</div>
                   {:else}
