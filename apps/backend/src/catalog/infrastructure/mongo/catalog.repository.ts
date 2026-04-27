@@ -47,6 +47,22 @@ export class MongoCatalogRepository implements CatalogRepository {
 
   private async searchProductPage(query: Record<string, unknown>, page: number, pageSize: number): Promise<SearchResponse> {
     const start = (page - 1) * pageSize;
+    const fallbackNameExpression = { $ifNull: ["$fileName", "$imageId"] };
+    const fallbackProductIdExpression = {
+      $switch: {
+        branches: [
+          {
+            case: { $regexMatch: { input: fallbackNameExpression, regex: /-(top-inf|bot-inf)$/i } },
+            then: { $substrCP: [fallbackNameExpression, 0, { $subtract: [{ $strLenCP: fallbackNameExpression }, 8] }] }
+          },
+          {
+            case: { $regexMatch: { input: fallbackNameExpression, regex: /-(top|bot)$/i } },
+            then: { $substrCP: [fallbackNameExpression, 0, { $subtract: [{ $strLenCP: fallbackNameExpression }, 4] }] }
+          }
+        ],
+        default: fallbackNameExpression
+      }
+    };
     const productIdExpression = {
       $ifNull: [
         "$metadata.product_id",
@@ -54,7 +70,7 @@ export class MongoCatalogRepository implements CatalogRepository {
           $ifNull: [
             "$metadata.productId",
             {
-              $ifNull: ["$metadata.productNo", { $ifNull: ["$fileName", "$imageId"] }]
+              $ifNull: ["$metadata.productNo", fallbackProductIdExpression]
             }
           ]
         }

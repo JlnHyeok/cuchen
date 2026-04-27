@@ -61,7 +61,11 @@ function productPage(records: CatalogRecord[], page: number, pageSize: number): 
 }
 
 function productIdForRecord(record: CatalogRecord): string {
-  return readFirstString(record.metadata ?? {}, ["product_id", "productId", "productNo"]) || record.fileName || record.imageId;
+  return readFirstString(record.metadata ?? {}, ["product_id", "productId", "productNo"]) || productIdFromName(record.fileName || record.imageId);
+}
+
+function productIdFromName(value: string): string {
+  return value.replace(/\.(png|jpg|jpeg|webp)$/i, "").replace(/-(top-inf|bot-inf|top|bot)$/i, "");
 }
 
 function latestUpdatedAt(records: CatalogRecord[]): string {

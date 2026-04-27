@@ -164,6 +164,26 @@ test("memory catalog product search falls back to file name", async () => {
   assert.equal(result.items[0]?.imageId, "search-check");
 });
 
+test("memory catalog product pagination groups file-name fallback divisions", async () => {
+  const catalog = new MemoryCatalogRepository();
+  await catalog.init();
+  await catalog.upsert(createFileNameFallbackRecord("bulk-0001-top", "2026-04-22T10:00:00.000Z"));
+  await catalog.upsert(createFileNameFallbackRecord("bulk-0001-bot", "2026-04-22T10:01:00.000Z"));
+  await catalog.upsert(createFileNameFallbackRecord("bulk-0001-top-inf", "2026-04-22T10:02:00.000Z"));
+  await catalog.upsert(createFileNameFallbackRecord("bulk-0001-bot-inf", "2026-04-22T10:03:00.000Z"));
+
+  const result = await catalog.search({ productPage: true }, 1, 20);
+
+  assert.equal(result.total, 1);
+  assert.equal(result.totalData, 4);
+  assert.deepEqual(result.items.map((item) => item.imageId).sort(), [
+    "bulk-0001-bot",
+    "bulk-0001-bot-inf",
+    "bulk-0001-top",
+    "bulk-0001-top-inf"
+  ]);
+});
+
 const SAMPLE_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8D8WkAAAAASUVORK5CYII=";
 
@@ -183,6 +203,25 @@ function createCatalogRecord(imageId: string, productId: string, div: string, up
       time: updatedAt,
       result: "PASS",
       threshold: 0.42
+    },
+    syncStatus: "synced" as const,
+    createdAt: updatedAt,
+    updatedAt
+  };
+}
+
+function createFileNameFallbackRecord(imageId: string, updatedAt: string) {
+  return {
+    imageId,
+    bucket: "test-bucket",
+    fileName: imageId,
+    fileExt: "jpg" as const,
+    sourcePath: `${imageId}.jpg`,
+    contentHash: "hash",
+    imageKey: `images/${imageId}.jpg`,
+    thumbnailKey: `thumbnails/${imageId}.webp`,
+    metadata: {
+      source: "minio-reconcile"
     },
     syncStatus: "synced" as const,
     createdAt: updatedAt,

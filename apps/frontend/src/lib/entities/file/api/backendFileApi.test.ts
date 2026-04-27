@@ -139,4 +139,46 @@ describe('backendFileApi', () => {
     expect(result.total).toBe(200);
     expect(result.totalData).toBe(800);
   });
+
+  it('groups file-name fallback image divisions into one product row', async () => {
+    const items = ['top', 'bot', 'top-inf', 'bot-inf'].map((div) => ({
+      imageId: `bulk-0001-${div}`,
+      bucket: 'test-bucket',
+      fileName: `bulk-0001-${div}`,
+      fileExt: 'jpg',
+      metadata: {
+        source: 'minio-reconcile'
+      },
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z'
+    }));
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'ok',
+            data: {
+              items,
+              total: 1,
+              totalData: 4,
+              page: 1,
+              pageSize: 20
+            },
+            errorCode: null,
+            errorMessage: null
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      })
+    );
+
+    const result = await listFiles({ page: 1, pageSize: 20 });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.productId).toBe('bulk-0001');
+    expect(result.items[0]?.fileCount).toBe(4);
+  });
 });

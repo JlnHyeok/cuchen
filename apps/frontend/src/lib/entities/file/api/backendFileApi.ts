@@ -194,11 +194,15 @@ function withExtension(fileName: string, fileExt: string): string {
   return `${fileName}.${ext}`;
 }
 
+function productIdFromName(value: string): string {
+  return value.replace(/\.(png|jpg|jpeg|webp)$/i, '').replace(/-(top-inf|bot-inf|top|bot)$/i, '');
+}
+
 function toFileListItem(record: CatalogRecord): FileListItem {
   const metadata = record.metadata ?? {};
   const baseName = record.fileName || record.imageId;
   const fileName = withExtension(baseName, record.fileExt);
-  const productId = readString(metadata, ['product_id', 'productId', 'productNo']) || baseName || record.imageId;
+  const productId = readString(metadata, ['product_id', 'productId', 'productNo']) || productIdFromName(baseName || record.imageId);
   const div = normalizeImageDiv(readString(metadata, ['div', 'processCode', 'process_code']), `${baseName} ${record.imageId}`);
   const result = normalizeInspectionResult(readString(metadata, ['result', 'aiResult', 'inspectionResult']));
 
