@@ -1,0 +1,9 @@
+{
+  "productNo": "PRD-10001",
+  "capturedAt": "2026-04-21T10:00:00.000Z",
+  "processCode": "P-001",
+  "result": "PASS",
+  "threshold": 0.42,
+  "lotNo": "LOT-001",
+  "cameraId": "CAM-01"
+}

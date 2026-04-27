@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cuchen Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <form id="filterForm" class="toolbar">
+        <label class="field bucket-field">
+          <span>Bucket</span>
+          <select id="bucketSelect">
+            <option value="all">All buckets</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>product_id</span>
+          <input id="productId" type="text" placeholder="PRD-100001" />
+        </label>
+        <label class="field">
+          <span>div</span>
+          <input id="divFilter" type="text" placeholder="DIV-A" />
+        </label>
+        <label class="field">
+          <span>result</span>
+          <select id="resultFilter">
+            <option value="">All</option>
+            <option value="OK">OK</option>
+            <option value="NG">NG</option>
+          </select>
+        </label>
+        <label class="field range-field">
+          <span>time</span>
+          <div class="range">
+            <input id="timeFrom" type="date" />
+            <span>~</span>
+            <input id="timeTo" type="date" />
+          </div>
+        </label>
+        <label class="field range-field">
+          <span>threshold</span>
+          <div class="range">
+            <input id="thresholdMin" type="number" step="0.01" min="0" max="1" placeholder="min" />
+            <span>~</span>
+            <input id="thresholdMax" type="number" step="0.01" min="0" max="1" placeholder="max" />
+          </div>
+        </label>
+        <label class="field range-field">
+          <span>prob</span>
+          <div class="range">
+            <input id="probMin" type="number" step="0.01" min="0" max="1" placeholder="min" />
+            <span>~</span>
+            <input id="probMax" type="number" step="0.01" min="0" max="1" placeholder="max" />
+          </div>
+        </label>
+        <label class="field">
+          <span>Page size</span>
+          <select id="pageSize">
+            <option value="1">1</option>
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+        <div class="toolbar-actions">
+          <button id="searchBtn" type="submit">검색</button>
+          <button id="resetBtn" type="button">초기화</button>
+          <button id="downloadBtn" type="button" disabled>다운로드</button>
+        </div>
+      </form>
+    </header>
+
+    <div id="statusBar" class="status-bar" aria-live="polite"></div>
+    <div id="connectionBanner" class="connection-banner is-hidden" aria-live="polite"></div>
+
+    <main class="layout">
+      <section class="panel list-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Files</div>
+            <div id="resultCount" class="panel-subtitle">0 items</div>
+          </div>
+          <div class="panel-meta">
+            <span id="filterSummary">No filters</span>
+            <span id="selectedCount">0 selected</span>
+          </div>
+        </div>
+        <div class="list-head">
+          <div class="list-col select-col">선택</div>
+          <div class="list-col name-col">이미지</div>
+          <div class="list-col product-col">product_id</div>
+          <div class="list-col div-col">div</div>
+          <div class="list-col time-col">time</div>
+          <div class="list-col result-col">result</div>
+          <div class="list-col threshold-col">threshold</div>
+          <div class="list-col prob-col">prob</div>
+          <div class="list-col action-col">보기</div>
+        </div>
+        <div id="list" class="list"></div>
+        <div class="pager">
+          <button id="prevBtn" type="button">이전</button>
+          <span id="pageLabel">1 / 1</span>
+          <button id="nextBtn" type="button">다음</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="viewerModal" class="modal is-hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-head">
+          <div>
+            <div class="modal-kicker">Image View</div>
+            <h2 id="modalTitle">이미지 보기</h2>
+            <p id="modalSubtitle">선택한 이미지의 메타데이터와 이미지를 함께 봅니다.</p>
+          </div>
+          <button id="modalCloseBtn" type="button">닫기</button>
+        </div>
+        <div class="modal-stack">
+          <article class="pane">
+            <div class="pane-title">Image</div>
+            <div class="modal-preview-frame">
+              <div id="modalPreviewSpinner" class="preview-spinner is-hidden" aria-hidden="true"></div>
+              <img id="modalPreview" alt="preview" />
+              <div id="modalPreviewMessage" class="preview-message is-hidden"></div>
+            </div>
+          </article>
+
+          <section class="modal-metadata">
+            <div class="pane-title">Metadata</div>
+            <div id="modalMetadataInfo" class="kv"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="./renderer.js" type="module"></script>
+  </body>
+</html>

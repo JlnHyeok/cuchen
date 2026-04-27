@@ -1,0 +1,15 @@
+{
+  "name": "@cuchen/desktop",
+  "private": true,
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "test": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "e2e": "node tests/e2e.mjs"
+  },
+  "devDependencies": {
+    "electron": "^41.2.1",
+    "playwright": "^1.52.0"
+  }
+}

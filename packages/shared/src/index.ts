@@ -1,0 +1,168 @@
+export type ImageExtension = "png" | "jpg" | "jpeg";
+
+export type SyncStatus = "pending" | "synced" | "partial" | "failed" | "missing-source";
+
+export interface MetadataDocument {
+  productNo?: string;
+  product_id?: string;
+  productId?: string;
+  capturedAt?: string;
+  captured_at?: string;
+  time?: string;
+  processCode?: string;
+  process_code?: string;
+  div?: string;
+  result?: string;
+  threshold?: number;
+  prob?: number;
+  lotNo?: string;
+  cameraId?: string;
+  [key: string]: unknown;
+}
+
+export interface CatalogRecord {
+  imageId: string;
+  bucket: string;
+  fileName: string;
+  fileExt: ImageExtension;
+  sourcePath: string;
+  contentHash: string;
+  imageKey: string;
+  thumbnailKey?: string;
+  rawJsonKey?: string;
+  metadata: MetadataDocument;
+  syncStatus: SyncStatus;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchFilters {
+  bucket?: string;
+  productNo?: string;
+  processCode?: string;
+  result?: string;
+  lotNo?: string;
+  cameraId?: string;
+  productPage?: boolean;
+  query?: string;
+  capturedAtFrom?: string;
+  capturedAtTo?: string;
+  thresholdMin?: number;
+  thresholdMax?: number;
+}
+
+export interface PaginationQuery {
+  page: number;
+  pageSize: number;
+}
+
+export interface SearchQuery extends SearchFilters, PaginationQuery {}
+
+export interface SearchResponse {
+  items: CatalogRecord[];
+  total: number;
+  totalData?: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface IngestOutcome {
+  processed: number;
+  synced: number;
+  partial: number;
+  failed: number;
+  skipped: number;
+}
+
+export const DEFAULT_PAGE = 1;
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 1000;
+
+const FIELD_ALIASES: Record<string, readonly string[]> = {
+  productNo: ["productNo", "productNumber", "sku", "제품번호", "품번"],
+  capturedAt: ["capturedAt", "captured_at", "shotAt", "shot_at", "촬영일시", "촬영시간"],
+  processCode: ["processCode", "process_code", "공정코드", "공정 코드"],
+  result: ["result", "aiResult", "inspectionResult", "판정결과", "ai판정결과", "검사결과"],
+  threshold: ["threshold", "inspectionThreshold", "임계치", "검사시임계치", "검사임계치"],
+  lotNo: ["lotNo", "lot_no", "lot", "lotNumber", "lot_number"],
+  cameraId: ["cameraId", "camera_id", "camera", "카메라", "카메라ID"]
+};
+
+export function normalizePagination(input: Partial<PaginationQuery>): PaginationQuery {
+  const page = typeof input.page === "number" && Number.isFinite(input.page) && input.page > 0 ? Math.floor(input.page) : DEFAULT_PAGE;
+  const pageSizeRaw = typeof input.pageSize === "number" && Number.isFinite(input.pageSize) ? Math.floor(input.pageSize) : DEFAULT_PAGE_SIZE;
+  const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, pageSizeRaw));
+  return { page, pageSize };
+}
+
+export function normalizeMetadata(source: Record<string, unknown>): MetadataDocument {
+  const metadata: MetadataDocument = {};
+  for (const [target, aliases] of Object.entries(FIELD_ALIASES)) {
+    const value = pickFirst(source, aliases);
+    if (value !== undefined) {
+      metadata[target] = target === "threshold" ? toNumberOrUndefined(value) : value;
+    }
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (isAliasKey(key)) {
+      continue;
+    }
+    metadata[key] = value;
+  }
+
+  return metadata;
+}
+
+export function extractAliasValues(source: Record<string, unknown>): MetadataDocument {
+  return normalizeMetadata(source);
+}
+
+export function buildSearchText(record: CatalogRecord): string {
+  const parts = [
+    record.imageId,
+    record.fileName,
+    record.metadata.product_id,
+    record.metadata.productId,
+    record.metadata.productNo,
+    record.metadata.div,
+    record.metadata.processCode,
+    record.metadata.result,
+    record.metadata.lotNo,
+    record.metadata.cameraId
+  ];
+  return parts.filter(Boolean).map((value) => String(value).toLowerCase()).join(" ");
+}
+
+export function buildThumbnailKey(imageId: string): string {
+  return `thumbnails/${imageId}.webp`;
+}
+
+function pickFirst(source: Record<string, unknown>, aliases: readonly string[]): unknown {
+  for (const alias of aliases) {
+    const value = source[alias];
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function isAliasKey(key: string): boolean {
+  return Object.values(FIELD_ALIASES).some((aliases) => aliases.includes(key));
+}
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
