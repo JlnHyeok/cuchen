@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listFiles } from './backendFileApi';
+import { unzipSync } from 'fflate';
+import { downloadFile, listFiles } from './backendFileApi';
 
 function catalogRecord(productIndex: number, div: string) {
   const productId = `PRD-${String(productIndex).padStart(4, '0')}`;
@@ -180,5 +181,72 @@ describe('backendFileApi', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.productId).toBe('bulk-0001');
     expect(result.items[0]?.fileCount).toBe(4);
+  });
+
+  it('downloads product images with matching metadata json sidecars', async () => {
+    const items = ['top', 'bot'].map((div) => catalogRecord(1, div));
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        const imageId = decodeURIComponent(url.pathname.split('/')[2] ?? '');
+        const record = items.find((item) => item.imageId === imageId) ?? items[0];
+
+        if (url.pathname.endsWith('/metadata')) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'ok',
+              data: record,
+              errorCode: null,
+              errorMessage: null
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          );
+        }
+
+        if (url.pathname === '/images/search') {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'ok',
+              data: {
+                items,
+                total: 2,
+                totalData: 2,
+                page: 1,
+                pageSize: 1000
+              },
+              errorCode: null,
+              errorMessage: null
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          );
+        }
+
+        if (url.pathname.endsWith('/blob')) {
+          return new Response(`image:${imageId}`, { status: 200, headers: { 'content-type': 'image/png' } });
+        }
+
+        return new Response('not found', { status: 404 });
+      })
+    );
+
+    const result = await downloadFile('PRD-0001-top');
+    const zipBytes = new Uint8Array(await result.blob.arrayBuffer());
+    const entries = unzipSync(zipBytes);
+    const metadata = JSON.parse(new TextDecoder().decode(entries['PRD-0001/PRD-0001-top.json'])) as Record<string, unknown>;
+
+    expect(result.fileName).toBe('PRD-0001.zip');
+    expect(Object.keys(entries).sort()).toEqual([
+      'PRD-0001/PRD-0001-bot.json',
+      'PRD-0001/PRD-0001-bot.png',
+      'PRD-0001/PRD-0001-top.json',
+      'PRD-0001/PRD-0001-top.png'
+    ]);
+    expect(new TextDecoder().decode(entries['PRD-0001/PRD-0001-top.png'])).toBe('image:PRD-0001-top');
+    expect(metadata.product_id).toBe('PRD-0001');
+    expect(metadata.div).toBe('top');
   });
 });

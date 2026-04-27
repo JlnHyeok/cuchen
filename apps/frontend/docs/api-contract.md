@@ -134,7 +134,7 @@ Envelope `data`:
 선택한 이미지 원본을 binary로 반환한다. 상세 모달 미리보기에서 사용한다.
 
 ### GET `/images/:imageId/download`
-선택한 이미지 원본을 다운로드용 binary로 반환한다. 제품 묶음 ZIP과 선택 ZIP은 프론트에서 여러 이미지 blob을 받아 `fflate`로 생성한다.
+선택한 이미지 원본을 다운로드용 binary로 반환한다. 프론트 다운로드는 이미지와 같은 basename의 metadata JSON을 함께 전달해야 하므로, 제품 묶음 ZIP과 선택 ZIP은 프론트에서 여러 이미지 blob과 `/images/:imageId/metadata` 응답의 `metadata`를 받아 `fflate`로 생성한다.
 
 ## MongoDB paging 기준
 - 정렬은 `updatedAt desc, imageId asc`를 사용한다.

@@ -1,4 +1,4 @@
-import { zipSync } from 'fflate';
+import { strToU8, zipSync } from 'fflate';
 import type { FileListItem, FileListQuery, FilterOptions, ImageDiv, InspectionResult, PageResult } from '@entities/file/model/types';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:3000';
@@ -304,7 +304,7 @@ function sanitizeZipPathPart(value: string): string {
   return value.replace(/[\\/:*?"<>|]+/g, '_').replace(/^\.+$/, '_') || 'file';
 }
 
-function uniqueEntryName(entries: Record<string, Uint8Array>, file: FileListItem): string {
+function uniqueImageEntryName(entries: Record<string, Uint8Array>, file: FileListItem): string {
   const productId = sanitizeZipPathPart(file.productId);
   const fileName = sanitizeZipPathPart(file.fileName || file.id);
   const dotIndex = fileName.lastIndexOf('.');
@@ -321,12 +321,27 @@ function uniqueEntryName(entries: Record<string, Uint8Array>, file: FileListItem
   return candidate;
 }
 
+function metadataEntryName(imageEntryName: string): string {
+  const slashIndex = imageEntryName.lastIndexOf('/');
+  const directory = slashIndex >= 0 ? imageEntryName.slice(0, slashIndex + 1) : '';
+  const fileName = slashIndex >= 0 ? imageEntryName.slice(slashIndex + 1) : imageEntryName;
+  const dotIndex = fileName.lastIndexOf('.');
+  const baseName = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+
+  return `${directory}${baseName}.json`;
+}
+
 async function makeZip(files: FileListItem[], fileName: string): Promise<{ blob: Blob; fileName: string }> {
   const entries: Record<string, Uint8Array> = {};
 
   for (const file of files) {
-    const blob = await getImageBlob(file.id);
-    entries[uniqueEntryName(entries, file)] = new Uint8Array(await blob.arrayBuffer());
+    const [blob, record] = await Promise.all([
+      getImageBlob(file.id),
+      requestJson<CatalogRecord>(`/images/${encodeURIComponent(file.id)}/metadata`)
+    ]);
+    const imageEntryName = uniqueImageEntryName(entries, file);
+    entries[imageEntryName] = new Uint8Array(await blob.arrayBuffer());
+    entries[metadataEntryName(imageEntryName)] = strToU8(JSON.stringify(record.metadata ?? {}, null, 2));
   }
 
   const zipBytes = zipSync(entries);
@@ -396,16 +411,7 @@ export async function getProductFiles(fileId: string): Promise<FileListItem[]> {
 
 export async function downloadFile(fileId: string): Promise<{ blob: Blob; fileName: string }> {
   const group = await getProductFiles(fileId);
-
-  if (group.length > 1) {
-    return makeZip(group, `${sanitizeZipPathPart(group[0].productId)}.zip`);
-  }
-
-  const file = group[0];
-  return {
-    blob: await requestBlob(`/images/${encodeURIComponent(file.id)}/download`),
-    fileName: file.fileName
-  };
+  return makeZip(group, `${sanitizeZipPathPart(group[0].productId)}.zip`);
 }
 
 export async function downloadFiles(fileIds: string[]): Promise<{ blob: Blob; fileName: string }> {

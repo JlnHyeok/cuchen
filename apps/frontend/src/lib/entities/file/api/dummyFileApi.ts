@@ -109,6 +109,7 @@ function makeZip(filesToZip: FileListItem[], fileName: string): { blob: Blob; fi
 
   for (const file of filesToZip) {
     entries[file.fileName] = strToU8(makeSvg(file));
+    entries[file.fileName.replace(/\.[^.]+$/, '.json')] = strToU8(JSON.stringify(toMetadataJson(file), null, 2));
   }
 
   const zipBytes = zipSync(entries);
@@ -118,6 +119,18 @@ function makeZip(filesToZip: FileListItem[], fileName: string): { blob: Blob; fi
   return {
     blob: new Blob([zipBuffer], { type: 'application/zip' }),
     fileName
+  };
+}
+
+function toMetadataJson(file: FileListItem): Record<string, string | number> {
+  return {
+    product_id: file.productId,
+    div: file.div,
+    time: file.time,
+    result: file.result,
+    threshold: file.threshold,
+    prob: file.prob,
+    size: file.sizeBytes
   };
 }
 
@@ -185,15 +198,7 @@ export async function downloadFile(fileId: string): Promise<{ blob: Blob; fileNa
   const group = getProductGroupByFileId(fileId);
   const representative = group[0];
 
-  if (group.length > 1 && representative) {
-    return makeZip(group, `${representative.productId}.zip`);
-  }
-
-  const file = findFile(fileId);
-  return {
-    blob: new Blob([makeSvg(file)], { type: 'image/svg+xml' }),
-    fileName: file.fileName
-  };
+  return makeZip(group, `${representative?.productId ?? fileId}.zip`);
 }
 
 export async function downloadFiles(fileIds: string[]): Promise<{ blob: Blob; fileName: string }> {
