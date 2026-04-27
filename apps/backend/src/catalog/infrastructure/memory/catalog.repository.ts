@@ -73,7 +73,7 @@ function matchesFilters(record: CatalogRecord, filters: SearchFilters): boolean 
   if (filters.bucket && record.bucket !== filters.bucket) return false;
   if (filters.productNo) {
     const needle = filters.productNo.trim().toLowerCase();
-    if (!readFirstString(metadata, ["productNo", "product_id", "productId"]).toLowerCase().includes(needle)) return false;
+    if (!productIdForRecord(record).toLowerCase().includes(needle)) return false;
   }
   if (filters.processCode && readFirstString(metadata, ["processCode", "process_code", "div"]) !== filters.processCode) return false;
   if (filters.result && !matchesResult(String(metadata.result ?? ""), filters.result)) return false;

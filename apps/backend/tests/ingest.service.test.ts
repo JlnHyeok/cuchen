@@ -146,6 +146,24 @@ test("memory catalog search supports product-level pagination", async () => {
   assert.deepEqual(secondPage.items.map((item) => item.imageId).sort(), ["product-a-bot", "product-a-top"]);
 });
 
+test("memory catalog product search falls back to file name", async () => {
+  const catalog = new MemoryCatalogRepository();
+  await catalog.init();
+  await catalog.upsert({
+    ...createCatalogRecord("search-check", "", "top", "2026-04-22T10:00:00.000Z"),
+    fileName: "search-check",
+    metadata: {
+      lotNo: "LOT-001",
+      cameraId: "CAM-01"
+    }
+  });
+
+  const result = await catalog.search({ productNo: "search" }, 1, 20);
+
+  assert.equal(result.total, 1);
+  assert.equal(result.items[0]?.imageId, "search-check");
+});
+
 const SAMPLE_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8D8WkAAAAASUVORK5CYII=";
 

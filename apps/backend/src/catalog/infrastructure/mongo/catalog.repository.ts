@@ -144,6 +144,8 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
     const escaped = escapeRegExp(filters.productNo);
     andConditions.push({
       $or: [
+        { imageId: { $regex: escaped, $options: "i" } },
+        { fileName: { $regex: escaped, $options: "i" } },
         { "metadata.productNo": { $regex: escaped, $options: "i" } },
         { "metadata.product_id": { $regex: escaped, $options: "i" } },
         { "metadata.productId": { $regex: escaped, $options: "i" } }
