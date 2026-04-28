@@ -19,6 +19,11 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDateTime(value: string): string {
+  const isoDateTime = value.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (isoDateTime) {
+    return `${isoDateTime[1]}-${isoDateTime[2]}-${isoDateTime[3]} ${isoDateTime[4]}:${isoDateTime[5]}`;
+  }
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '-';
