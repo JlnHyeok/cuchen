@@ -26,8 +26,35 @@
     return value;
   }
 
+  function formatList(values: Array<string | undefined>): string {
+    const uniqueValues = [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
+    if (uniqueValues.length === 0) return '-';
+    return uniqueValues.join(', ');
+  }
+
+  function formatPercent(value: number): string {
+    return `${Math.round(value * 100)}%`;
+  }
+
+  function formatThreshold(values: number[]): string {
+    const validValues = values.filter((value) => Number.isFinite(value));
+    if (validValues.length === 0) return '-';
+
+    const min = Math.min(...validValues);
+    const max = Math.max(...validValues);
+    if (min === max) return min.toFixed(2);
+    return `${min.toFixed(2)}-${max.toFixed(2)}`;
+  }
+
   $: detailColumnCount = Math.min(Math.max(items.length || 1, 1), 4);
   $: detailModalWidth = detailColumnCount * 420 + (detailColumnCount - 1) * 16 + 42;
+  $: files = items.map((item) => item.file);
+  $: commonCapturedAt = files.reduce((latest, file) => (file.time > latest ? file.time : latest), files[0]?.time ?? '');
+  $: commonProcess = formatList(files.map((file) => file.process));
+  $: commonVersion = formatList(files.map((file) => file.version));
+  $: commonResult = files.some((file) => file.result === 'NG') ? 'NG' : 'OK';
+  $: commonProbability = files.reduce((minimum, file) => Math.min(minimum, file.prob), files[0]?.prob ?? 0);
+  $: commonThreshold = formatThreshold(files.map((file) => file.threshold));
 </script>
 
 {#if open}
@@ -55,74 +82,87 @@
         {:else if error}
           <p class="error">{error}</p>
         {:else if items.length > 0}
-          <div class="detail-grid">
-            {#each items as item (item.file.id)}
-              <article class="detail-card">
-                <div class="detail-card-header">
-                  <div>
-                    <h3>{formatDiv(item.file.div)}</h3>
-                    <p>{item.file.fileName}</p>
-                  </div>
-                  <span class:ok={item.file.result === 'OK'} class:ng={item.file.result === 'NG'} class="tag">
-                    {item.file.result}
+          <div class="detail-layout">
+            <dl class="common-metadata">
+              <div class="common-field product-field">
+                <dt>제품번호</dt>
+                <dd>{productId}</dd>
+              </div>
+              <div class="common-field captured-field">
+                <dt>촬영일시</dt>
+                <dd>{commonCapturedAt ? formatDateTime(commonCapturedAt) : '-'}</dd>
+              </div>
+              <div class="common-field process-field">
+                <dt>공정</dt>
+                <dd>{commonProcess}</dd>
+              </div>
+              <div class="common-field version-field">
+                <dt>Version</dt>
+                <dd>{commonVersion}</dd>
+              </div>
+              <div class="common-field quality-field">
+                <dt>AI 품질 판정</dt>
+                <dd>
+                  <span class="quality-badge">
+                    <span class:ok={commonResult === 'OK'} class:ng={commonResult === 'NG'} class="tag">
+                      {commonResult}
+                    </span>
+                    <span class:ok={commonResult === 'OK'} class:ng={commonResult === 'NG'} class="quality-percent">{formatPercent(commonProbability)}</span>
                   </span>
-                </div>
+                </dd>
+              </div>
+              <div class="common-field probability-field">
+                <dt>예측값</dt>
+                <dd>{formatPercent(commonProbability)}</dd>
+              </div>
+              <div class="common-field threshold-field">
+                <dt>판정 기준</dt>
+                <dd>{commonThreshold}</dd>
+              </div>
+            </dl>
 
-                <div class="detail-image-shell">
-                  {#if item.imageUrl}
-                    <button
-                      class="detail-image-button"
-                      type="button"
-                      aria-label={`${formatDiv(item.file.div)} 원본 보기`}
-                      on:click={() => onOpenOriginal(item.file)}
-                      on:focus={() => onPrefetchOriginal(item.file)}
-                      on:mouseenter={() => onPrefetchOriginal(item.file)}
-                    >
-                      <img class="detail-image" src={item.imageUrl} alt={`${item.file.productId} ${formatDiv(item.file.div)} 미리보기`} />
-                    </button>
-                  {:else if item.imageError}
-                    <div class="detail-image-placeholder detail-image-error">{item.imageError}</div>
-                  {:else}
-                    <div class="detail-image-placeholder">{item.imageLoading ? '이미지 불러오는 중...' : '이미지가 없습니다.'}</div>
-                  {/if}
-                </div>
+            <div class="detail-grid">
+              {#each items as item (item.file.id)}
+                <article class="detail-card">
+                  <div class="detail-card-header">
+                    <div>
+                      <h3>{formatDiv(item.file.div)}</h3>
+                      <p>{item.file.fileName}</p>
+                    </div>
+                  </div>
 
-                <dl class="metadata-list">
-                  <div>
-                    <dt>제품번호</dt>
-                    <dd>{item.file.productId}</dd>
+                  <div class="detail-image-shell">
+                    {#if item.imageUrl}
+                      <button
+                        class="detail-image-button"
+                        type="button"
+                        aria-label={`${formatDiv(item.file.div)} 원본 보기`}
+                        on:click={() => onOpenOriginal(item.file)}
+                        on:focus={() => onPrefetchOriginal(item.file)}
+                        on:mouseenter={() => onPrefetchOriginal(item.file)}
+                      >
+                        <img class="detail-image" src={item.imageUrl} alt={`${item.file.productId} ${formatDiv(item.file.div)} 미리보기`} />
+                      </button>
+                    {:else if item.imageError}
+                      <div class="detail-image-placeholder detail-image-error">{item.imageError}</div>
+                    {:else}
+                      <div class="detail-image-placeholder">{item.imageLoading ? '이미지 불러오는 중...' : '이미지가 없습니다.'}</div>
+                    {/if}
                   </div>
-                  <div>
-                    <dt>이미지 구분</dt>
-                    <dd>{formatDiv(item.file.div)}</dd>
-                  </div>
-                  <div>
-                    <dt>촬영 일시</dt>
-                    <dd>{formatDateTime(item.file.time)}</dd>
-                  </div>
-                  <div>
-                    <dt>로트 번호</dt>
-                    <dd>{item.file.lotNo ?? '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>카메라 ID</dt>
-                    <dd>{item.file.cameraId ?? '-'}</dd>
-                  </div>
-                  <div>
-                    <dt>판정 임계 값</dt>
-                    <dd>{item.file.threshold.toFixed(2)}</dd>
-                  </div>
-                  <div>
-                    <dt>예측 확률</dt>
-                    <dd>{Math.round(item.file.prob * 100)}%</dd>
-                  </div>
-                  <div>
-                    <dt>크기</dt>
-                    <dd>{formatBytes(item.file.sizeBytes)}</dd>
-                  </div>
-                </dl>
-              </article>
-            {/each}
+
+                  <dl class="metadata-list">
+                    <div>
+                      <dt>이미지 구분</dt>
+                      <dd>{formatDiv(item.file.div)}</dd>
+                    </div>
+                    <div>
+                      <dt>크기</dt>
+                      <dd>{formatBytes(item.file.sizeBytes)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              {/each}
+            </div>
           </div>
         {:else}
           <p>표시할 이미지가 없습니다.</p>

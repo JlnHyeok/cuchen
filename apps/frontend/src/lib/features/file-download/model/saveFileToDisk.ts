@@ -1,5 +1,7 @@
-import { downloadFile, downloadFiles } from '@entities/file/api';
-import type { FileListItem } from '@entities/file/model';
+import { downloadAllFiles, downloadFile, downloadFiles } from '@entities/file/api';
+import type { FileListItem, FileListQuery } from '@entities/file/model';
+
+type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
 
 function saveBlob(blob: Blob, fileName: string): { canceled: boolean; filePath: string } {
   const url = URL.createObjectURL(blob);
@@ -31,9 +33,16 @@ export async function saveFileToDisk(file: FileListItem): Promise<{ canceled: bo
   });
 }
 
-export async function saveSelectedFilesToDisk(fileIds: string[]): Promise<{ canceled: boolean; filePath?: string }> {
+export async function saveSelectedFilesToDisk(fileIds: string[], onProgress?: DownloadProgressHandler): Promise<{ canceled: boolean; filePath?: string }> {
   return saveWithPicker(`cuchen-selected-${fileIds.length}-products.zip`, async () => {
-    const { blob } = await downloadFiles(fileIds);
+    const { blob } = await downloadFiles(fileIds, onProgress);
+    return blob;
+  });
+}
+
+export async function saveAllFilesToDisk(query: FileListQuery, totalProducts: number, onProgress?: DownloadProgressHandler): Promise<{ canceled: boolean; filePath?: string }> {
+  return saveWithPicker(`cuchen-all-${totalProducts}-products.zip`, async () => {
+    const { blob } = await downloadAllFiles(query, onProgress);
     return blob;
   });
 }

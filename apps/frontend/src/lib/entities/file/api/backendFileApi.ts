@@ -6,6 +6,8 @@ const BACKEND_PAGE_SIZE = 1000;
 const IMAGE_DIVS: ImageDiv[] = ['top', 'bot', 'top-inf', 'bot-inf'];
 const INSPECTION_RESULTS: InspectionResult[] = ['OK', 'NG'];
 const IMAGE_DIV_ORDER = new Map<ImageDiv, number>(IMAGE_DIVS.map((div, index) => [div, index]));
+const PROCESS_KEYS = ['process', 'processCode', 'process_code', 'processName', 'process_name'];
+const VERSION_KEYS = ['version', 'Version', 'modelVersion', 'model_version', 'inspectionVersion', 'inspection_version', 'recipeVersion', 'recipe_version'];
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -35,6 +37,7 @@ interface SearchResponse {
 }
 
 type QueryParams = Record<string, string | number | undefined>;
+type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
 
 function getBackendBaseUrl(): string {
   const configured = import.meta.env.VITE_BACKEND_URL as string | undefined;
@@ -121,7 +124,8 @@ function toBackendSearchQuery(query: Partial<FileListQuery>, page: number, pageS
     productNo: query.productId,
     lotNo: query.lotNo,
     cameraId: query.cameraId,
-    processCode: query.div,
+    processCode: query.process ?? query.div,
+    version: query.version,
     result: query.result,
     capturedAtFrom: toDateStart(query.dateFrom),
     capturedAtTo: toDateEnd(query.dateTo)
@@ -204,6 +208,8 @@ function toFileListItem(record: CatalogRecord): FileListItem {
   const fileName = withExtension(baseName, record.fileExt);
   const productId = readString(metadata, ['product_id', 'productId', 'productNo']) || productIdFromName(baseName || record.imageId);
   const div = normalizeImageDiv(readString(metadata, ['div', 'processCode', 'process_code']), `${baseName} ${record.imageId}`);
+  const process = readString(metadata, PROCESS_KEYS);
+  const version = readString(metadata, VERSION_KEYS);
   const result = normalizeInspectionResult(readString(metadata, ['result', 'aiResult', 'inspectionResult']));
 
   return {
@@ -211,6 +217,8 @@ function toFileListItem(record: CatalogRecord): FileListItem {
     fileName,
     productId,
     div,
+    process,
+    version,
     time: normalizeTime(readString(metadata, ['time', 'capturedAt', 'captured_at']), record),
     result,
     threshold: readNumber(metadata, ['threshold', 'inspectionThreshold', 'inspection_threshold'], 0),
@@ -223,6 +231,8 @@ function toFileListItem(record: CatalogRecord): FileListItem {
 
 function matchesClientFilters(file: FileListItem, query: Partial<FileListQuery>): boolean {
   if (query.productId && file.productId !== query.productId) return false;
+  if (query.process && file.process !== query.process) return false;
+  if (query.version && file.version !== query.version) return false;
   if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
   if (query.cameraId && !file.cameraId?.toLowerCase().includes(query.cameraId.toLowerCase())) return false;
   if (query.div && file.div !== query.div) return false;
@@ -268,12 +278,18 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
       const minProbFile = [...sorted].sort((left, right) => left.prob - right.prob)[0] ?? sorted[0];
       const representative = sorted.find((file) => file.result === 'NG') ?? minProbFile;
       const thresholds = sorted.map((file) => file.threshold);
+      const processes = uniqueValues(sorted.map((file) => file.process));
+      const versions = uniqueValues(sorted.map((file) => file.version));
 
       return {
         ...representative,
         fileName: representative.productId,
         divs: sorted.map((file) => file.div),
         fileCount: sorted.length,
+        process: processes[0] ?? representative.process,
+        processes,
+        version: versions[0] ?? representative.version,
+        versions,
         result,
         threshold: minProbFile.threshold,
         thresholdMin: minNumber(thresholds),
@@ -331,8 +347,9 @@ function metadataEntryName(imageEntryName: string): string {
   return `${directory}${baseName}.json`;
 }
 
-async function makeZip(files: FileListItem[], fileName: string): Promise<{ blob: Blob; fileName: string }> {
+async function makeZip(files: FileListItem[], fileName: string, onProgress?: DownloadProgressHandler): Promise<{ blob: Blob; fileName: string }> {
   const entries: Record<string, Uint8Array> = {};
+  let completed = 0;
 
   for (const file of files) {
     const [blob, record] = await Promise.all([
@@ -342,6 +359,8 @@ async function makeZip(files: FileListItem[], fileName: string): Promise<{ blob:
     const imageEntryName = uniqueImageEntryName(entries, file);
     entries[imageEntryName] = new Uint8Array(await blob.arrayBuffer());
     entries[metadataEntryName(imageEntryName)] = strToU8(JSON.stringify(record.metadata ?? {}, null, 2));
+    completed += 1;
+    onProgress?.({ completed, total: files.length, message: `이미지 다운로드 중 ${completed}/${files.length}` });
   }
 
   const zipBytes = zipSync(entries);
@@ -385,6 +404,8 @@ export async function getFilterOptions(): Promise<FilterOptions> {
 
   return {
     productIds: [...new Set(items.map((file) => file.productId))].sort((left, right) => left.localeCompare(right)),
+    processes: uniqueValues(items.map((file) => file.process)).sort((left, right) => left.localeCompare(right)),
+    versions: uniqueValues(items.map((file) => file.version)).sort((left, right) => left.localeCompare(right)),
     divs: IMAGE_DIVS.filter((div) => items.some((file) => file.div === div)),
     results: INSPECTION_RESULTS.filter((result) => items.some((file) => file.result === result))
   };
@@ -414,7 +435,7 @@ export async function downloadFile(fileId: string): Promise<{ blob: Blob; fileNa
   return makeZip(group, `${sanitizeZipPathPart(group[0].productId)}.zip`);
 }
 
-export async function downloadFiles(fileIds: string[]): Promise<{ blob: Blob; fileName: string }> {
+export async function downloadFiles(fileIds: string[], onProgress?: DownloadProgressHandler): Promise<{ blob: Blob; fileName: string }> {
   const uniqueFileIds = [...new Set(fileIds)];
   if (uniqueFileIds.length === 0) {
     throw new Error('선택된 제품이 없습니다.');
@@ -431,7 +452,45 @@ export async function downloadFiles(fileIds: string[]): Promise<{ blob: Blob; fi
     }
   }
 
-  return makeZip([...selectedFiles.values()], `cuchen-selected-${productIds.size}-products.zip`);
+  return makeZip([...selectedFiles.values()], `cuchen-selected-${productIds.size}-products.zip`, onProgress);
+}
+
+export async function downloadAllFiles(query: FileListQuery, onProgress?: DownloadProgressHandler): Promise<{ blob: Blob; fileName: string }> {
+  const pageSize = BACKEND_PAGE_SIZE;
+  let page = 1;
+  let totalProducts = 0;
+  const filesById = new Map<string, FileListItem>();
+
+  while (true) {
+    const response = await fetchProductSearchPage(query, page, pageSize);
+    totalProducts = response.total;
+    const pageItems = response.items.map(toFileListItem);
+    for (const item of pageItems) {
+      filesById.set(item.id, item);
+    }
+
+    const fetchedProducts = Math.min(page * pageSize, totalProducts);
+    onProgress?.({
+      completed: fetchedProducts,
+      total: totalProducts,
+      message: `다운로드 대상 수집 중 ${fetchedProducts}/${totalProducts}`
+    });
+
+    if (response.items.length === 0 || fetchedProducts >= totalProducts) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  if (filesById.size === 0) {
+    throw new Error('다운로드할 제품이 없습니다.');
+  }
+
+  const files = [...filesById.values()].sort(
+    (left, right) => left.productId.localeCompare(right.productId) || (IMAGE_DIV_ORDER.get(left.div) ?? 999) - (IMAGE_DIV_ORDER.get(right.div) ?? 999)
+  );
+  return makeZip(files, `cuchen-all-${totalProducts}-products.zip`, onProgress);
 }
 
 export const backendFileApiTestHooks = {

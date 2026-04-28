@@ -7,6 +7,8 @@ export interface FileListQuery {
   dateFrom?: string;
   dateTo?: string;
   productId?: string;
+  process?: string;
+  version?: string;
   lotNo?: string;
   cameraId?: string;
   div?: ImageDiv;
@@ -20,6 +22,10 @@ export interface FileListItem {
   div: ImageDiv;
   divs?: ImageDiv[];
   fileCount?: number;
+  process?: string;
+  processes?: string[];
+  version?: string;
+  versions?: string[];
   time: string;
   result: InspectionResult;
   threshold: number;
@@ -48,6 +54,8 @@ export interface PageResult<T> {
 
 export interface FilterOptions {
   productIds: string[];
+  processes: string[];
+  versions: string[];
   divs: ImageDiv[];
   results: InspectionResult[];
 }

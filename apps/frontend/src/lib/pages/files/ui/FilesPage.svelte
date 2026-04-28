@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { getFilterOptions, getImageBlob, getPreviewImageBlob, getProductFiles, listFiles } from '@entities/file/api';
   import type { FileListItem, FileListQuery, FilterOptions, PageResult } from '@entities/file/model';
-  import { saveFileToDisk, saveSelectedFilesToDisk } from '@features/file-download/model/saveFileToDisk';
+  import { saveAllFilesToDisk, saveFileToDisk, saveSelectedFilesToDisk } from '@features/file-download/model/saveFileToDisk';
   import FileFilters from '@features/file-filter/ui/FileFilters.svelte';
   import ImagePreviewModal from '@features/image-preview/ui/ImagePreviewModal.svelte';
   import OriginalImageViewer from '@features/image-preview/ui/OriginalImageViewer.svelte';
@@ -10,7 +10,7 @@
   import Pagination from '@widgets/file-table/ui/Pagination.svelte';
   import { getErrorMessage } from '@shared/lib/errors';
 
-  type FilterValues = Pick<FileListQuery, 'dateFrom' | 'dateTo' | 'productId' | 'lotNo' | 'cameraId' | 'div' | 'result'>;
+  type FilterValues = Pick<FileListQuery, 'dateFrom' | 'dateTo' | 'productId' | 'process' | 'version' | 'result'>;
   type PreviewImageItem = {
     file: FileListItem;
     imageUrl?: string;
@@ -29,15 +29,31 @@
   const maxOriginalBlobCacheSize = 8;
   const pageSizeOptions = [10, 20, 50];
 
-  let filters: FilterValues = {};
-  let filterOptions: FilterOptions = { productIds: [], divs: [], results: [] };
-  let query: FileListQuery = { page: 1, pageSize: 20 };
+  function toDateInputValue(date = new Date()): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function createDefaultFilters(): FilterValues {
+    const today = toDateInputValue();
+    return {
+      dateFrom: today,
+      dateTo: today
+    };
+  }
+
+  let filters: FilterValues = createDefaultFilters();
+  let filterOptions: FilterOptions = { productIds: [], processes: [], versions: [], divs: [], results: [] };
+  let query: FileListQuery = { ...filters, page: 1, pageSize: 20 };
   let pageResult = initialPage;
   let loading = true;
   let errorMessage = '';
   let statusMessage = '';
   let downloadingId: string | null = null;
   let downloadingSelected = false;
+  let downloadingAll = false;
   let selectedIds: string[] = [];
 
   let previewOpen = false;
@@ -83,8 +99,9 @@
   }
 
   function resetFilters(): void {
-    filters = {};
-    void loadFiles({ page: 1, pageSize: query.pageSize });
+    const defaultFilters = createDefaultFilters();
+    filters = defaultFilters;
+    void loadFiles({ ...defaultFilters, page: 1, pageSize: query.pageSize });
   }
 
   function changePage(nextPage: number): void {
@@ -275,15 +292,41 @@
 
     downloadingSelected = true;
     errorMessage = '';
-    statusMessage = '';
+    statusMessage = '선택 파일 ZIP을 준비하는 중입니다.';
 
     try {
-      const result = await saveSelectedFilesToDisk(selectedIds);
+      const result = await saveSelectedFilesToDisk(selectedIds, (progress) => {
+        statusMessage = progress.message;
+      });
       statusMessage = result.canceled ? '선택 다운로드가 취소되었습니다.' : `선택 파일 저장 완료: ${result.filePath ?? selectedIds.length}`;
     } catch (error) {
       errorMessage = getErrorMessage(error);
     } finally {
       downloadingSelected = false;
+    }
+  }
+
+  async function downloadAllFiles(): Promise<void> {
+    if (pageResult.total === 0) return;
+
+    const confirmed = window.confirm(
+      `현재 검색 조건의 전체 ${pageResult.total.toLocaleString()}개 제품을 ZIP으로 생성합니다.\n데이터가 많으면 시간이 걸릴 수 있습니다.`
+    );
+    if (!confirmed) return;
+
+    downloadingAll = true;
+    errorMessage = '';
+    statusMessage = '전체 다운로드 ZIP을 준비하는 중입니다.';
+
+    try {
+      const result = await saveAllFilesToDisk({ ...query, page: 1 }, pageResult.total, (progress) => {
+        statusMessage = progress.message;
+      });
+      statusMessage = result.canceled ? '전체 다운로드가 취소되었습니다.' : `전체 파일 저장 완료: ${result.filePath ?? pageResult.total}`;
+    } catch (error) {
+      errorMessage = getErrorMessage(error);
+    } finally {
+      downloadingAll = false;
     }
   }
 
@@ -330,7 +373,7 @@
           {/if}
         </p>
       </div>
-      <div class="list-heading-actions" aria-label="선택 다운로드">
+      <div class="list-heading-actions" aria-label="다운로드">
         <label class="page-size-control">
           <span>페이지 크기</span>
           <select value={pageResult.pageSize} disabled={loading} on:change={(event) => changePageSize(Number(event.currentTarget.value))}>
@@ -340,7 +383,10 @@
           </select>
         </label>
         <p class="selection-pill">선택 {selectedIds.length.toLocaleString()}개 제품</p>
-        <button type="button" class="primary" disabled={selectedIds.length === 0 || loading || downloadingSelected} on:click={downloadSelectedFiles}>
+        <button type="button" disabled={pageResult.total === 0 || loading || downloadingAll || downloadingSelected} on:click={downloadAllFiles}>
+          {downloadingAll ? 'ZIP 생성 중' : '전체 다운로드'}
+        </button>
+        <button type="button" class="primary" disabled={selectedIds.length === 0 || loading || downloadingSelected || downloadingAll} on:click={downloadSelectedFiles}>
           {downloadingSelected ? '저장 중' : '선택 다운로드'}
         </button>
       </div>
@@ -349,6 +395,7 @@
       items={pageResult.items}
       {loading}
       {downloadingId}
+      actionsDisabled={downloadingSelected || downloadingAll}
       {selectedIdSet}
       {allVisibleSelected}
       onPreview={openPreview}
