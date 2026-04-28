@@ -513,6 +513,20 @@ tbody tr.row-refreshing:nth-child(3n) td:nth-child(even)::after {
   background: #f4f7f9;
 }
 
+.empty-panel {
+  position: absolute;
+  inset: 33px 0 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  color: var(--muted);
+  background: #f4f7f9;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .initial-loading {
   display: inline-flex;
   align-items: center;
@@ -605,12 +619,6 @@ tbody tr.selected-row:hover {
   min-width: 68px;
   min-height: 28px;
   padding: 0 10px;
-}
-
-.empty {
-  height: 360px;
-  color: var(--muted);
-  text-align: center;
 }
 
 .tag {

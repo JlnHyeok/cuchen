@@ -40,6 +40,10 @@
         <span>파일 목록을 불러오는 중입니다.</span>
       </div>
     </div>
+  {:else if items.length === 0}
+    <div class="empty-panel" role="status" aria-live="polite">
+      <span>조건에 맞는 파일이 없습니다.</span>
+    </div>
   {/if}
 
   <table class:table-refreshing={loading && items.length > 0}>
@@ -65,13 +69,7 @@
       </tr>
     </thead>
     <tbody>
-      {#if items.length === 0}
-        <tr>
-          <td class="empty" colspan="9">
-            {loading ? '' : '조건에 맞는 파일이 없습니다.'}
-          </td>
-        </tr>
-      {:else}
+      {#if items.length > 0}
         {#each items as file}
           <tr class:selected-row={selectedIdSet.has(file.id)} class:row-refreshing={loading}>
             <td class="select-col">
