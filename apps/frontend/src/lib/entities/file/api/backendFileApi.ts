@@ -6,7 +6,8 @@ const BACKEND_PAGE_SIZE = 1000;
 const IMAGE_DIVS: ImageDiv[] = ['top', 'bot', 'top-inf', 'bot-inf'];
 const INSPECTION_RESULTS: InspectionResult[] = ['OK', 'NG'];
 const IMAGE_DIV_ORDER = new Map<ImageDiv, number>(IMAGE_DIVS.map((div, index) => [div, index]));
-const PROCESS_KEYS = ['processId', 'process_id', 'process', 'processName', 'process_name', 'cameraId', 'camera_id', 'camera'];
+const PROCESS_CODE_KEYS = ['processCode', 'process_code', '공정코드', '공정 코드'];
+const PROCESS_ID_KEYS = ['processId', 'process_id', 'process', 'processName', 'process_name', 'cameraId', 'camera_id', 'camera'];
 const VERSION_KEYS = ['version', 'Version', 'modelVersion', 'model_version', 'inspectionVersion', 'inspection_version', 'recipeVersion', 'recipe_version'];
 
 interface ApiEnvelope<T> {
@@ -123,10 +124,11 @@ function toBackendSearchQuery(query: Partial<FileListQuery>, page: number, pageS
     pageSize,
     productNo: query.productId,
     lotNo: query.lotNo,
-    processId: query.process ?? query.processId,
+    processId: query.processId,
     processCode: query.div,
     version: query.version,
     result: query.result,
+    query: query.process,
     capturedAtFrom: toDateStart(query.dateFrom),
     capturedAtTo: toDateEnd(query.dateTo)
   };
@@ -168,9 +170,25 @@ function readNumber(metadata: Record<string, unknown>, keys: string[], fallback:
   return fallback;
 }
 
+function readOptionalNumber(metadata: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function isImageDiv(value: string | undefined): value is ImageDiv {
+  return Boolean(value && IMAGE_DIVS.includes(value.trim().toLowerCase() as ImageDiv));
+}
+
 function normalizeImageDiv(value: string | undefined, fallbackText: string): ImageDiv {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === 'top' || normalized === 'bot' || normalized === 'top-inf' || normalized === 'bot-inf') {
+  if (isImageDiv(normalized)) {
     return normalized;
   }
 
@@ -192,6 +210,11 @@ function normalizeTime(value: string | undefined, record: CatalogRecord): string
   return value || record.updatedAt || record.createdAt || new Date(0).toISOString();
 }
 
+function normalizeDisplayProcess(processCode: string | undefined, processId: string | undefined): string | undefined {
+  if (processCode && !isImageDiv(processCode)) return processCode;
+  return processId ?? processCode;
+}
+
 function withExtension(fileName: string, fileExt: string): string {
   const ext = fileExt.replace(/^\./, '').toLowerCase();
   if (!ext || fileName.toLowerCase().endsWith(`.${ext}`)) return fileName;
@@ -207,8 +230,10 @@ function toFileListItem(record: CatalogRecord): FileListItem {
   const baseName = record.fileName || record.imageId;
   const fileName = withExtension(baseName, record.fileExt);
   const productId = readString(metadata, ['product_id', 'productId', 'productNo']) || productIdFromName(baseName || record.imageId);
-  const div = normalizeImageDiv(readString(metadata, ['div', 'processCode', 'process_code']), `${baseName} ${record.imageId}`);
-  const process = readString(metadata, PROCESS_KEYS);
+  const processCode = readString(metadata, PROCESS_CODE_KEYS);
+  const processId = readString(metadata, PROCESS_ID_KEYS);
+  const div = normalizeImageDiv(readString(metadata, ['div']) ?? (isImageDiv(processCode) ? processCode : undefined), `${baseName} ${record.imageId}`);
+  const process = normalizeDisplayProcess(processCode, processId);
   const version = readString(metadata, VERSION_KEYS);
   const result = normalizeInspectionResult(readString(metadata, ['result', 'aiResult', 'inspectionResult']));
 
@@ -218,20 +243,21 @@ function toFileListItem(record: CatalogRecord): FileListItem {
     productId,
     div,
     process,
+    processCode,
+    processId,
     version,
     time: normalizeTime(readString(metadata, ['time', 'capturedAt', 'captured_at']), record),
     result,
     threshold: readNumber(metadata, ['threshold', 'inspectionThreshold', 'inspection_threshold'], 0),
-    prob: readNumber(metadata, ['prob', 'probability', 'confidence', 'score', 'aiProb', 'inspectionProb', 'inspectionScore'], 0),
+    prob: readOptionalNumber(metadata, ['prob', 'probability', 'confidence', 'score', 'aiProb', 'inspectionProb', 'inspectionScore']) ?? Number.NaN,
     sizeBytes: readNumber(metadata, ['size', 'fileSize', 'sizeBytes'], 0),
-    lotNo: readString(metadata, ['lotNo', 'lot_no', 'lot', 'lotNumber', 'lot_number']),
-    processId: process
+    lotNo: readString(metadata, ['lotNo', 'lot_no', 'lot', 'lotNumber', 'lot_number'])
   };
 }
 
 function matchesClientFilters(file: FileListItem, query: Partial<FileListQuery>): boolean {
   if (query.productId && file.productId !== query.productId) return false;
-  if (query.process && file.process !== query.process) return false;
+  if (query.process && ![file.process, file.processCode, file.processId].some((value) => value?.toLowerCase().includes(query.process!.toLowerCase()))) return false;
   if (query.version && file.version !== query.version) return false;
   if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
   if (query.processId && !file.processId?.toLowerCase().includes(query.processId.toLowerCase())) return false;
@@ -255,11 +281,13 @@ function uniqueValues(values: Array<string | undefined>): string[] {
 }
 
 function minNumber(values: number[]): number {
-  return values.reduce((min, value) => Math.min(min, value), values[0] ?? 0);
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  return finiteValues.reduce((min, value) => Math.min(min, value), finiteValues[0] ?? Number.NaN);
 }
 
 function maxNumber(values: number[]): number {
-  return values.reduce((max, value) => Math.max(max, value), values[0] ?? 0);
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  return finiteValues.reduce((max, value) => Math.max(max, value), finiteValues[0] ?? Number.NaN);
 }
 
 function groupProductRows(items: FileListItem[]): FileListItem[] {
@@ -275,9 +303,10 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
       const okCount = sorted.filter((file) => file.result === 'OK').length;
       const ngCount = sorted.filter((file) => file.result === 'NG').length;
       const result: InspectionResult = ngCount > 0 ? 'NG' : 'OK';
-      const minProbFile = [...sorted].sort((left, right) => left.prob - right.prob)[0] ?? sorted[0];
+      const minProbFile = [...sorted].filter((file) => Number.isFinite(file.prob)).sort((left, right) => left.prob - right.prob)[0] ?? sorted[0];
       const representative = sorted.find((file) => file.result === 'NG') ?? minProbFile;
       const thresholds = sorted.map((file) => file.threshold);
+      const processCodes = uniqueValues(sorted.map((file) => file.processCode));
       const processes = uniqueValues(sorted.map((file) => file.process));
       const versions = uniqueValues(sorted.map((file) => file.version));
 
@@ -288,6 +317,8 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
         fileCount: sorted.length,
         process: processes[0] ?? representative.process,
         processes,
+        processCode: processCodes[0] ?? representative.processCode,
+        processCodes,
         version: versions[0] ?? representative.version,
         versions,
         result,
@@ -295,7 +326,7 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
         thresholdMin: minNumber(thresholds),
         thresholdMax: maxNumber(thresholds),
         prob: minProbFile.prob,
-        minProb: minProbFile.prob,
+        minProb: Number.isFinite(minProbFile.prob) ? minProbFile.prob : undefined,
         minProbDiv: minProbFile.div,
         time: latestTime(sorted),
         sizeBytes: sorted.reduce((sum, file) => sum + file.sizeBytes, 0),

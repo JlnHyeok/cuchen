@@ -17,8 +17,9 @@
     return (event.currentTarget as HTMLInputElement).checked;
   }
 
-  function displayProbability(file: FileListItem): number {
-    return file.minProb ?? file.prob;
+  function displayProbability(file: FileListItem): number | undefined {
+    const value = file.minProb ?? file.prob;
+    return Number.isFinite(value) ? value : undefined;
   }
 
   function formatList(values: string[] | undefined): string {
@@ -28,7 +29,8 @@
   }
 
   function formatQualityPercent(file: FileListItem): string {
-    return `${Math.round(displayProbability(file) * 100)}%`;
+    const probability = displayProbability(file);
+    return probability === undefined ? '-' : `${Math.round(probability * 100)}%`;
   }
 </script>
 
@@ -61,7 +63,7 @@
         <th class="file-name-col">제품번호</th>
         <th class="result-cell">AI 품질 판정</th>
         <th class="metadata-date-col">촬영일시</th>
-        <th class="metadata-process-col">공정 ID</th>
+        <th class="metadata-process-col">공정</th>
         <th class="metadata-list-col">Version</th>
         <th class="size-col">크기</th>
         <th class="action-col">상세</th>

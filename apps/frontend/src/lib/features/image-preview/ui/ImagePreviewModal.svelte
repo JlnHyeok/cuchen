@@ -32,8 +32,8 @@
     return uniqueValues.join(', ');
   }
 
-  function formatPercent(value: number): string {
-    return `${Math.round(value * 100)}%`;
+  function formatPercent(value: number | undefined): string {
+    return value === undefined || !Number.isFinite(value) ? '-' : `${Math.round(value * 100)}%`;
   }
 
   function formatThreshold(values: number[]): string {
@@ -46,6 +46,12 @@
     return `${min.toFixed(2)}-${max.toFixed(2)}`;
   }
 
+  function minFinite(values: number[]): number | undefined {
+    const finiteValues = values.filter((value) => Number.isFinite(value));
+    if (finiteValues.length === 0) return undefined;
+    return Math.min(...finiteValues);
+  }
+
   $: detailColumnCount = Math.min(Math.max(items.length || 1, 1), 4);
   $: detailModalWidth = detailColumnCount * 420 + (detailColumnCount - 1) * 16 + 42;
   $: files = items.map((item) => item.file);
@@ -53,7 +59,7 @@
   $: commonProcess = formatList(files.map((file) => file.process));
   $: commonVersion = formatList(files.map((file) => file.version));
   $: commonResult = files.some((file) => file.result === 'NG') ? 'NG' : 'OK';
-  $: commonProbability = files.reduce((minimum, file) => Math.min(minimum, file.prob), files[0]?.prob ?? 0);
+  $: commonProbability = minFinite(files.map((file) => file.prob));
   $: commonThreshold = formatThreshold(files.map((file) => file.threshold));
 </script>
 
@@ -93,7 +99,7 @@
                 <dd>{commonCapturedAt ? formatDateTime(commonCapturedAt) : '-'}</dd>
               </div>
               <div class="common-field process-field">
-                <dt>공정 ID</dt>
+                <dt>공정</dt>
                 <dd>{commonProcess}</dd>
               </div>
               <div class="common-field version-field">
@@ -107,7 +113,6 @@
                     <span class:ok={commonResult === 'OK'} class:ng={commonResult === 'NG'} class="tag">
                       {commonResult}
                     </span>
-                    <span class:ok={commonResult === 'OK'} class:ng={commonResult === 'NG'} class="quality-percent">{formatPercent(commonProbability)}</span>
                   </span>
                 </dd>
               </div>
@@ -153,14 +158,6 @@
                     <div>
                       <dt>이미지 구분</dt>
                       <dd>{formatDiv(item.file.div)}</dd>
-                    </div>
-                    <div>
-                      <dt>LOT</dt>
-                      <dd>{item.file.lotNo ?? '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>공정 ID</dt>
-                      <dd>{item.file.processId ?? '-'}</dd>
                     </div>
                     <div>
                       <dt>크기</dt>

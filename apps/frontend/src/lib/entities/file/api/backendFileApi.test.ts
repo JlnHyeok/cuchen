@@ -12,6 +12,9 @@ function catalogRecord(productIndex: number, div: string) {
     metadata: {
       product_id: productId,
       div,
+      processCode: '압력검사',
+      processId: 'PROC-01',
+      version: 'v1',
       time: `2026-04-${String((productIndex % 20) + 1).padStart(2, '0')}T09:00:00.000Z`,
       result: 'OK',
       threshold: 0.8,
@@ -55,7 +58,7 @@ describe('backendFileApi', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await listFiles({ page: 2, pageSize: 20 });
+    const result = await listFiles({ page: 2, pageSize: 20, process: '압력검사', version: 'v1' });
     const requestUrl = new URL(requestedUrl);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -63,10 +66,46 @@ describe('backendFileApi', () => {
     expect(requestUrl.searchParams.get('page')).toBe('2');
     expect(requestUrl.searchParams.get('pageSize')).toBe('20');
     expect(requestUrl.searchParams.get('productPage')).toBe('1');
+    expect(requestUrl.searchParams.get('query')).toBe('압력검사');
+    expect(requestUrl.searchParams.get('version')).toBe('v1');
     expect(result.items).toHaveLength(20);
     expect(new Set(result.items.map((item) => item.productId)).size).toBe(20);
+    expect(result.items[0]?.process).toBe('압력검사');
     expect(result.total).toBe(141);
     expect(result.totalData).toBe(564);
+  });
+
+  it('keeps probability blank when backend metadata has no probability value', async () => {
+    const item = catalogRecord(1, 'top');
+    const { prob: _prob, ...metadataWithoutProb } = item.metadata;
+    const itemWithoutProb = { ...item, metadata: metadataWithoutProb };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'ok',
+            data: {
+              items: [itemWithoutProb],
+              total: 1,
+              totalData: 1,
+              page: 1,
+              pageSize: 20
+            },
+            errorCode: null,
+            errorMessage: null
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      })
+    );
+
+    const result = await listFiles({ page: 1, pageSize: 20 });
+
+    expect(Number.isNaN(result.items[0]?.prob)).toBe(true);
+    expect(result.items[0]?.minProb).toBeUndefined();
   });
 
   it('does not render more rows than the requested page size', async () => {

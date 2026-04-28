@@ -18,7 +18,8 @@ const files: FileListItem[] = Array.from({ length: 72 }, (_value, index) => {
   const threshold = Number((0.7 + (productIndex % 5) * 0.03).toFixed(2));
   const prob = Number((productIndex % 3 === 0 ? 0.88 - (productIndex % 7) * 0.02 : 0.42 + (productIndex % 6) * 0.04).toFixed(2));
   const result: InspectionResult = prob >= threshold ? 'OK' : 'NG';
-  const process = `P${(productIndex % 3) + 1}`;
+  const process = ['압력검사', '외관검사', '조립검사'][productIndex % 3];
+  const processId = `PROC-${(productIndex % 3) + 1}`;
   const version = `V${(productIndex % 2) + 1}`;
 
   return {
@@ -27,6 +28,8 @@ const files: FileListItem[] = Array.from({ length: 72 }, (_value, index) => {
     productId,
     div,
     process,
+    processCode: process,
+    processId,
     version,
     time,
     result,
@@ -62,7 +65,7 @@ function filterFiles(query: FileListQuery): FileListItem[] {
     if (from !== null && capturedAt < from) return false;
     if (to !== null && capturedAt > to) return false;
     if (query.productId && file.productId !== query.productId) return false;
-    if (query.process && file.process !== query.process) return false;
+    if (query.process && ![file.process, file.processCode, file.processId].some((value) => value?.toLowerCase().includes(query.process!.toLowerCase()))) return false;
     if (query.version && file.version !== query.version) return false;
     if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
     if (query.processId && !file.processId?.toLowerCase().includes(query.processId.toLowerCase())) return false;
@@ -109,6 +112,8 @@ function toProductListItem(productId: string): FileListItem {
     fileCount: group.length,
     process: representative.process,
     processes: [...new Set(group.map((file) => file.process).filter((value): value is string => Boolean(value)))],
+    processCode: representative.processCode,
+    processCodes: [...new Set(group.map((file) => file.processCode).filter((value): value is string => Boolean(value)))],
     version: representative.version,
     versions: [...new Set(group.map((file) => file.version).filter((value): value is string => Boolean(value)))],
     sizeBytes: group.reduce((sum, file) => sum + file.sizeBytes, 0)
@@ -144,7 +149,8 @@ function toMetadataJson(file: FileListItem): Record<string, string | number> {
     result: file.result,
     threshold: file.threshold,
     prob: file.prob,
-    process: file.process ?? '',
+    processCode: file.processCode ?? file.process ?? '',
+    processId: file.processId ?? '',
     version: file.version ?? '',
     size: file.sizeBytes
   };
