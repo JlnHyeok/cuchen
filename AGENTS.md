@@ -16,7 +16,6 @@
 - `docs/*/spec.md`: 구현 계약
 - `docs/*/plan.md`: 진행 계획
 - `docs/*/review.md`: 리뷰 기준
-- `legacy/`: 참고용 과거 구현. 새 구현 기준으로 삼지 않는다.
 
 ## 작업 전 읽기 순서
 1. `AGENTS.md`
@@ -39,7 +38,6 @@
 - `apps/backend/`: NestJS 백엔드
 - `apps/frontend/`: SvelteKit 최종 사용자 UI
 - `apps/desktop/`: Electron 데스크톱 앱
-- `packages/shared/`: 공용 타입, DTO, 스키마
 - `infra/docker/`: MongoDB, MinIO, backend 실행 인프라
 - `docs/`: 명세, 계획, 리뷰, 에이전트 운영 문서
 
@@ -48,12 +46,11 @@
 - MinIO는 이미지 원본, 썸네일, 다운로드 객체의 정본이다.
 - SvelteKit 프론트엔드는 MongoDB나 MinIO에 직접 접근하지 않는다.
 - 프론트엔드는 backend HTTP API를 통해서만 목록, 이미지, 다운로드를 처리한다.
-- 공용 계약이 필요한 값은 `packages/shared/`를 우선한다.
+- 백엔드 내부 공용 타입과 유틸은 `apps/backend/src/shared.ts`를 우선한다.
 
 ## 검증 기준
 - backend 변경: `cd apps/backend && npm run test`
 - frontend 변경: `cd apps/frontend && npm test && npm run check && npm run build`
 - desktop 변경: `cd apps/desktop && npm run test`
-- shared 변경: `cd packages/shared && npm run build`
 - docker 변경: `cd infra/docker && docker compose --env-file .env config`
 - 문서만 변경한 경우에는 실행 검증 대신 변경 이유와 동기화 범위를 남긴다.

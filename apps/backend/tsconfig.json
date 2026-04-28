@@ -1,14 +1,23 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "target": "ES2022",
     "outDir": "dist",
     "rootDir": "src",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "baseUrl": ".",
-    "paths": {
-      "@cuchen/shared": ["../../packages/shared/dist/index.d.ts"]
-    }
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+    "noEmitOnError": true,
+    "noUncheckedIndexedAccess": true,
+    "lib": ["ES2022"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

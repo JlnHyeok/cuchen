@@ -4,7 +4,6 @@
 
 ## 포함 파일
 - `docker-compose.yml`
-- `backend.Dockerfile`
 - `.env.example`
 - `bootstrap.sh`
 
@@ -29,6 +28,7 @@
 
 ## 메모
 - backend는 `infra/docker/.env`의 환경변수를 읽는다.
+- backend 이미지는 `apps/backend/Dockerfile`에서 빌드한다.
 - backend의 로컬 개발 환경은 `apps/backend/.env`를 사용한다.
 - desktop(Electron)은 로컬 앱으로 남겨도 된다.
 - 불필요한 reverse proxy나 init service는 넣지 않는다.

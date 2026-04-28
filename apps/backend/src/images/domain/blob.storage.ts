@@ -1,5 +1,5 @@
 import type { Readable } from "node:stream";
-import type { CatalogRecord } from "@cuchen/shared";
+import type { CatalogRecord } from "../../shared.js";
 
 export interface BlobStorage {
   init(): Promise<void>;

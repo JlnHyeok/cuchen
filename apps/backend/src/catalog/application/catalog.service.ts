@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { SearchQuery } from "@cuchen/shared";
+import type { SearchQuery } from "../../shared.js";
 import { CATALOG_REPOSITORY } from "../../storage/storage.tokens.js";
 import type { CatalogRepository } from "../domain/catalog.repository.js";
 

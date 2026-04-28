@@ -1,5 +1,5 @@
-import type { CatalogRecord, SearchFilters, SearchResponse } from "@cuchen/shared";
-import { buildSearchText } from "@cuchen/shared";
+import type { CatalogRecord, SearchFilters, SearchResponse } from "../../../shared.js";
+import { buildSearchText } from "../../../shared.js";
 import type { CatalogRepository } from "../../domain/catalog.repository.js";
 
 export class MemoryCatalogRepository implements CatalogRepository {
@@ -82,7 +82,24 @@ function matchesFilters(record: CatalogRecord, filters: SearchFilters): boolean 
   if (filters.processCode && readFirstString(metadata, ["processCode", "process_code", "div"]) !== filters.processCode) return false;
   if (filters.result && !matchesResult(String(metadata.result ?? ""), filters.result)) return false;
   if (filters.lotNo && !readFirstString(metadata, ["lotNo", "lot_no", "lot", "lotNumber", "lot_number"]).toLowerCase().includes(filters.lotNo.toLowerCase())) return false;
-  if (filters.cameraId && !readFirstString(metadata, ["cameraId", "camera_id", "camera"]).toLowerCase().includes(filters.cameraId.toLowerCase())) return false;
+  if (filters.processId && !readFirstString(metadata, ["processId", "process_id", "process", "processName", "process_name"]).toLowerCase().includes(filters.processId.toLowerCase())) return false;
+  if (
+    filters.version &&
+    !readFirstString(metadata, [
+      "version",
+      "metadataVersion",
+      "metadata_version",
+      "Version",
+      "modelVersion",
+      "model_version",
+      "inspectionVersion",
+      "inspection_version",
+      "recipeVersion",
+      "recipe_version"
+    ])
+      .toLowerCase()
+      .includes(filters.version.toLowerCase())
+  ) return false;
   if (filters.query) {
     const text = buildSearchText(record);
     if (!text.includes(filters.query.toLowerCase())) return false;

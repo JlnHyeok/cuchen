@@ -10,7 +10,7 @@ export interface FileListQuery {
   process?: string;
   version?: string;
   lotNo?: string;
-  cameraId?: string;
+  processId?: string;
   div?: ImageDiv;
   result?: InspectionResult;
 }
@@ -37,8 +37,8 @@ export interface FileListItem {
   sizeBytes: number;
   lotNo?: string;
   lotNos?: string[];
-  cameraId?: string;
-  cameraIds?: string[];
+  processId?: string;
+  processIds?: string[];
   okCount?: number;
   ngCount?: number;
 }

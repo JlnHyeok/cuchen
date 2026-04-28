@@ -98,7 +98,8 @@ Query:
 - `processCode`: `top | bot | top-inf | bot-inf`, 선택. 백엔드는 `processCode`, `process_code`, `div`를 함께 검색한다.
 - `result`: `OK | NG`, 선택
 - `lotNo`: string, 선택
-- `cameraId`: string, 선택
+- `processId`: string, 선택
+- `version`: string, 선택
 
 Envelope `data`:
 ```json
@@ -139,7 +140,7 @@ Envelope `data`:
 ## MongoDB paging 기준
 - 정렬은 `updatedAt desc, imageId asc`를 사용한다.
 - `skip = (page - 1) * pageSize`, `limit = pageSize`를 사용한다.
-- 기간/제품번호/이미지구분/검사결과/LOT/CAMERA는 MongoDB query 조건으로 처리한다.
+- 기간/제품번호/이미지구분/검사결과/LOT/공정 ID는 MongoDB query 조건으로 처리한다.
 - 목록 화면은 `productPage=1`을 사용해 MongoDB에서 `productId`로 그룹핑한 뒤 대표 row 단위로 페이지네이션한다.
 - `productPage=1`일 때 `total`은 총 제품 수, `totalData`는 조건에 맞는 총 이미지 수다.
 - 응답 shape는 더미 API와 동일하게 유지한다.

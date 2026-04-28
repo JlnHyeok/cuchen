@@ -93,7 +93,7 @@
                 <dd>{commonCapturedAt ? formatDateTime(commonCapturedAt) : '-'}</dd>
               </div>
               <div class="common-field process-field">
-                <dt>공정</dt>
+                <dt>공정 ID</dt>
                 <dd>{commonProcess}</dd>
               </div>
               <div class="common-field version-field">
@@ -149,11 +149,18 @@
                       <div class="detail-image-placeholder">{item.imageLoading ? '이미지 불러오는 중...' : '이미지가 없습니다.'}</div>
                     {/if}
                   </div>
-
                   <dl class="metadata-list">
                     <div>
                       <dt>이미지 구분</dt>
                       <dd>{formatDiv(item.file.div)}</dd>
+                    </div>
+                    <div>
+                      <dt>LOT</dt>
+                      <dd>{item.file.lotNo ?? '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>공정 ID</dt>
+                      <dd>{item.file.processId ?? '-'}</dd>
                     </div>
                     <div>
                       <dt>크기</dt>

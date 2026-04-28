@@ -1,4 +1,4 @@
-import type { CatalogRecord } from "@cuchen/shared";
+import type { CatalogRecord } from "../../../shared.js";
 import { Readable } from "node:stream";
 import type { BlobStorage } from "../../domain/blob.storage.js";
 

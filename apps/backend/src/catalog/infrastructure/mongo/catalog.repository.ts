@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import type { Model } from "mongoose";
-import type { CatalogRecord, SearchFilters, SearchResponse } from "@cuchen/shared";
+import type { CatalogRecord, SearchFilters, SearchResponse } from "../../../shared.js";
 import type { CatalogRepository } from "../../domain/catalog.repository.js";
 import { CATALOG_MODEL_NAME, type CatalogMongoDocument } from "./catalog.schema.js";
 import { normalizeCatalogRecord } from "./catalog-mapper.js";
@@ -183,9 +183,33 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
       "metadata.lotNo": { $regex: escapeRegExp(filters.lotNo), $options: "i" }
     });
   }
-  if (filters.cameraId) {
+  if (filters.processId) {
+    const escaped = escapeRegExp(filters.processId);
     andConditions.push({
-      "metadata.cameraId": { $regex: escapeRegExp(filters.cameraId), $options: "i" }
+      $or: [
+        { "metadata.processId": { $regex: escaped, $options: "i" } },
+        { "metadata.process_id": { $regex: escaped, $options: "i" } },
+        { "metadata.process": { $regex: escaped, $options: "i" } },
+        { "metadata.processName": { $regex: escaped, $options: "i" } },
+        { "metadata.process_name": { $regex: escaped, $options: "i" } }
+      ]
+    });
+  }
+  if (filters.version) {
+    const escaped = escapeRegExp(filters.version);
+    andConditions.push({
+      $or: [
+        { "metadata.version": { $regex: escaped, $options: "i" } },
+        { "metadata.metadataVersion": { $regex: escaped, $options: "i" } },
+        { "metadata.metadata_version": { $regex: escaped, $options: "i" } },
+        { "metadata.Version": { $regex: escaped, $options: "i" } },
+        { "metadata.modelVersion": { $regex: escaped, $options: "i" } },
+        { "metadata.model_version": { $regex: escaped, $options: "i" } },
+        { "metadata.inspectionVersion": { $regex: escaped, $options: "i" } },
+        { "metadata.inspection_version": { $regex: escaped, $options: "i" } },
+        { "metadata.recipeVersion": { $regex: escaped, $options: "i" } },
+        { "metadata.recipe_version": { $regex: escaped, $options: "i" } }
+      ]
     });
   }
   if (filters.capturedAtFrom || filters.capturedAtTo) {
@@ -221,7 +245,8 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
         { "metadata.processCode": { $regex: escaped, $options: "i" } },
         { "metadata.result": { $regex: escaped, $options: "i" } },
         { "metadata.lotNo": { $regex: escaped, $options: "i" } },
-        { "metadata.cameraId": { $regex: escaped, $options: "i" } }
+        { "metadata.processId": { $regex: escaped, $options: "i" } },
+        { "metadata.version": { $regex: escaped, $options: "i" } }
       ]
     });
   }

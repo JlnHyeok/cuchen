@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Client } from "minio";
 import mongoose from "mongoose";
-import { buildThumbnailKey } from "@cuchen/shared";
+import { DEFAULT_METADATA_VERSION, buildThumbnailKey } from "../shared.js";
 import { loadAppConfig } from "../common/config/app-config.js";
 import { CATALOG_MODEL_NAME, createCatalogSchema } from "../catalog/infrastructure/mongo/catalog.schema.js";
 
@@ -158,7 +158,8 @@ function buildCatalogDocument(bucketName: string, object: MinioListObject) {
       contentType: fileExt === "jpg" || fileExt === "jpeg" ? "image/jpeg" : "image/png",
       size,
       etag,
-      lastModified: timestamp
+      lastModified: timestamp,
+      version: DEFAULT_METADATA_VERSION
     },
     syncStatus: "synced" as const,
     createdAt: timestamp,

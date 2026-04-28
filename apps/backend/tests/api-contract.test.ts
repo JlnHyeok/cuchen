@@ -7,7 +7,7 @@ import path from "node:path";
 import test, { after, before } from "node:test";
 import { APP_FILTER, APP_INTERCEPTOR, NestFactory } from "@nestjs/core";
 import { Module } from "@nestjs/common";
-import type { CatalogRecord } from "@cuchen/shared";
+import type { CatalogRecord } from "../src/shared.js";
 import { CatalogController } from "../src/catalog/api/catalog.controller.js";
 import { CatalogService } from "../src/catalog/application/catalog.service.js";
 import { HealthController } from "../src/health/health.controller.js";
@@ -68,7 +68,8 @@ before(async () => {
       result: "PASS",
       threshold: 0.42,
       lotNo: "LOT-001",
-      cameraId: "CAM-01"
+      processId: "PROC-01",
+      version: "v1"
     },
     syncStatus: "synced",
     createdAt: "2026-04-23T00:00:00.000Z",
@@ -146,7 +147,7 @@ test("json endpoints are wrapped in the common envelope", async () => {
 
 test("search endpoint is served from the catalog API", async () => {
   const response = await fetch(
-    `${baseUrl}/images/search?lotNo=LOT-001&cameraId=CAM-01&page=1&pageSize=20&productPage=1`
+    `${baseUrl}/images/search?lotNo=LOT-001&processId=PROC-01&version=v1&page=1&pageSize=20&productPage=1`
   );
   assert.equal(response.status, 200);
   const body = (await response.json()) as {

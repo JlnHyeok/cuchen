@@ -3,8 +3,7 @@
 이 저장소는 `MongoDB + MinIO + NestJS + SvelteKit` 구조로 개발하는 워크스페이스 루트다.
 
 ## 현재 상태
-- 기존 JS/MinIO 프로토타입은 `legacy/minio-prototype/`로 분리했다.
-- 앞으로 실제 개발은 `apps/`, `packages/`, `infra/` 아래에서만 진행한다.
+- 앞으로 실제 개발은 `apps/`, `infra/` 아래에서 진행한다.
 - 각 프로젝트는 자기 폴더의 `package.json`, lock, `node_modules`를 관리한다.
 - 백엔드 로컬 환경은 `apps/backend/.env`, Docker 환경은 `infra/docker/.env`를 사용한다.
 - MongoDB / MinIO는 `infra/docker`의 Docker Compose를 별도로 실행해야 한다.
@@ -18,14 +17,10 @@ apps/
     generated/  백엔드 전용 감시 폴더와 임시 입력 데이터
   frontend/     SvelteKit 최종 사용자 UI
   desktop/      Electron 데스크톱 앱
-packages/
-  shared/       공용 타입, DTO, 유틸
 infra/
   docker/       Docker Compose, 환경별 배포 파일
 docs/           명세, 계획, 리뷰, 세부 에이전트 규칙
 artifacts/      보고서, 로그, 벤치마크 결과
-legacy/
-  minio-prototype/  기존 프로토타입 보관
 ```
 
 ## 개발 원칙
@@ -33,13 +28,11 @@ legacy/
 - 백엔드 코드는 `apps/backend/`에만 둔다.
 - SvelteKit 프론트엔드 코드는 `apps/frontend/`에 둔다.
 - Electron 데스크톱 앱 코드는 `apps/desktop/`에 둔다.
-- 공용 타입과 스키마는 `packages/shared/`로 모은다.
+- 백엔드 내부 타입과 유틸은 `apps/backend/src/shared.ts`에 둔다.
 - Docker 관련 파일은 `infra/docker/`에서 관리한다.
 - 루트의 `package.json`, `package-lock.json`, `node_modules`는 두지 않는다.
-- 기존 프로토타입은 참고만 하고, 새 구현의 기준으로 삼지 않는다.
 
 ## 실행
-- `cd packages/shared && npm run build`
 - `cd apps/backend && npm run dev`
   - 기본 감시 폴더는 `apps/backend/generated/inbox`다.
   - MongoDB / MinIO 실연동을 보려면 먼저 `cd infra/docker && docker compose --env-file .env up -d`를 실행한다.

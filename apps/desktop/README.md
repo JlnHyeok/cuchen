@@ -18,7 +18,3 @@
   - JS 문법 체크를 실행한다.
 - `npm run e2e`
   - 실제 Electron 창을 띄워 backend 연동, 필터링, 미리보기, 저장 동작을 코드로 검증한다.
-
-## 주의
-- 기존 Electron 프로토타입은 `legacy/minio-prototype/electron/`에 있다.
-- 새 구현은 여기서부터 다시 시작한다.

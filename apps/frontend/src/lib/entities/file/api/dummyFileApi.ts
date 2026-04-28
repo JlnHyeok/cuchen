@@ -65,7 +65,7 @@ function filterFiles(query: FileListQuery): FileListItem[] {
     if (query.process && file.process !== query.process) return false;
     if (query.version && file.version !== query.version) return false;
     if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
-    if (query.cameraId && !file.cameraId?.toLowerCase().includes(query.cameraId.toLowerCase())) return false;
+    if (query.processId && !file.processId?.toLowerCase().includes(query.processId.toLowerCase())) return false;
     if (query.div && file.div !== query.div) return false;
     if (query.result && file.result !== query.result) return false;
 

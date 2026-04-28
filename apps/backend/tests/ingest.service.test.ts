@@ -11,7 +11,8 @@ test("ingest service stores metadata and blob in memory mode", async () => {
   const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-test-"));
   const imagePath = path.join(rootDir, "sample.png");
   const jsonPath = path.join(rootDir, "sample.json");
-  await fs.writeFile(imagePath, Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+  const imageBuffer = Buffer.from(SAMPLE_PNG_BASE64, "base64");
+  await fs.writeFile(imagePath, imageBuffer);
   await fs.writeFile(
     jsonPath,
     JSON.stringify({
@@ -21,7 +22,8 @@ test("ingest service stores metadata and blob in memory mode", async () => {
       result: "PASS",
       threshold: 0.42,
       lotNo: "LOT-001",
-      cameraId: "CAM-01"
+      processId: "PROC-01",
+      version: "v1"
     })
   );
 
@@ -41,6 +43,8 @@ test("ingest service stores metadata and blob in memory mode", async () => {
   const loaded = await catalog.findById(record.imageId);
   assert.ok(loaded);
   assert.equal(loaded?.metadata.productNo, "PRD-10001");
+  assert.equal(loaded?.metadata.version, "v1");
+  assert.equal(loaded?.metadata.size, imageBuffer.length);
 });
 
 test("scanAndIngest walks nested directories", async () => {
@@ -70,6 +74,9 @@ test("scanAndIngest walks nested directories", async () => {
   assert.equal(outcome.synced, 1);
   const records = await catalog.listPendingPairs();
   assert.equal(records.length, 0);
+  const searchResult = await catalog.search({ productNo: "PRD-20002" }, 1, 20);
+  assert.equal(searchResult.items[0]?.metadata.version, "v1");
+  assert.equal(searchResult.items[0]?.metadata.size, Buffer.from(SAMPLE_PNG_BASE64, "base64").length);
 });
 
 test("memory catalog search supports canonical metadata fields", async () => {
@@ -92,7 +99,8 @@ test("memory catalog search supports canonical metadata fields", async () => {
       threshold: 0.42,
       prob: 0.87,
       lotNo: "LOT-001",
-      cameraId: "CAM-TOP"
+      processId: "PROC-TOP",
+      version: "v1"
     },
     syncStatus: "synced",
     createdAt: "2026-04-21T10:00:00.000Z",
@@ -103,7 +111,8 @@ test("memory catalog search supports canonical metadata fields", async () => {
     {
       productNo: "CUCHEN-00001",
       lotNo: "LOT",
-      cameraId: "CAM",
+      processId: "PROC",
+      version: "v1",
       processCode: "top",
       capturedAtFrom: "2026-04-21T00:00:00.000Z",
       capturedAtTo: "2026-04-21T23:59:59.999Z",
@@ -119,7 +128,7 @@ test("memory catalog search supports canonical metadata fields", async () => {
   const noMatch = await catalog.search(
     {
       lotNo: "LOT-NOT-FOUND",
-      cameraId: "CAM-NOT-FOUND"
+      processId: "PROC-NOT-FOUND"
     },
     1,
     20
@@ -154,7 +163,7 @@ test("memory catalog product search falls back to file name", async () => {
     fileName: "search-check",
     metadata: {
       lotNo: "LOT-001",
-      cameraId: "CAM-01"
+      processId: "PROC-01"
     }
   });
 

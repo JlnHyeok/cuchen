@@ -1,5 +1,5 @@
 import { Client } from "minio";
-import type { CatalogRecord } from "@cuchen/shared";
+import type { CatalogRecord } from "../../../shared.js";
 import type { Readable } from "node:stream";
 import type { BlobStorage } from "../../domain/blob.storage.js";
 
@@ -31,14 +31,16 @@ export class MinioObjectStorage implements BlobStorage {
 
   async putImage(record: CatalogRecord, imageBuffer: Buffer, mimeType: string): Promise<void> {
     await this.client.putObject(this.bucketName, record.imageKey, imageBuffer, imageBuffer.length, {
-      "Content-Type": mimeType
+      "Content-Type": mimeType,
+      ...buildObjectUserMetadata(record)
     });
   }
 
   async putThumbnail(record: CatalogRecord, imageBuffer: Buffer, mimeType: string): Promise<void> {
     const key = record.thumbnailKey ?? record.imageKey;
     await this.client.putObject(this.bucketName, key, imageBuffer, imageBuffer.length, {
-      "Content-Type": mimeType
+      "Content-Type": mimeType,
+      ...buildObjectUserMetadata(record)
     });
   }
 
@@ -67,4 +69,15 @@ function getContentType(ext: string): string {
     return "image/jpeg";
   }
   return "image/png";
+}
+
+function buildObjectUserMetadata(record: CatalogRecord): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(record.metadata)
+      .filter((entry): entry is [string, string | number | boolean] => {
+        const [, value] = entry;
+        return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+      })
+      .map(([key, value]) => [`X-Amz-Meta-${key}`, String(value)])
+  );
 }

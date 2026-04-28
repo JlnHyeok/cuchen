@@ -1,4 +1,4 @@
-import type { CatalogRecord, SearchFilters, SearchResponse } from "@cuchen/shared";
+import type { CatalogRecord, SearchFilters, SearchResponse } from "../../shared.js";
 
 export interface CatalogRepository {
   init(): Promise<void>;

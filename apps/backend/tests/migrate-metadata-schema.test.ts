@@ -11,23 +11,27 @@ test("migration plan converts legacy fields to canonical metadata", () => {
     processCode: "P-001",
     result: "pass",
     threshold: "0.42",
+    size: "1024",
     confidence: "0.87",
     metadata: {
       lotNo: "LOT-001",
-      cameraId: "CAM-01"
+      cameraId: "CAM-01",
+      version: "v1"
     }
   });
 
   assert.equal(plan.status, "update");
   assert.deepEqual(plan.metadata, {
     lotNo: "LOT-001",
-    cameraId: "CAM-01",
+    processId: "CAM-01",
+    version: "v1",
     product_id: "PRD-10001",
     div: "P-001",
-    time: "2026-04-21T10:00:00.000Z",
+    capturedAt: "2026-04-21T10:00:00.000Z",
     result: "PASS",
     threshold: 0.42,
-    prob: 0.87
+    prob: 0.87,
+    size: 1024
   });
   assert.deepEqual(new Set(plan.unsetRootKeys), new Set([
     "productNo",
@@ -35,18 +39,19 @@ test("migration plan converts legacy fields to canonical metadata", () => {
     "processCode",
     "result",
     "threshold",
+    "size",
     "confidence"
   ]));
 });
 
-test("migration plan is noop for already normalized records", () => {
+test("migration plan adds default version to already normalized records", () => {
   const plan = planMetadataMigration({
     _id: "2",
     imageId: "sample-2",
     metadata: {
       product_id: "PRD-20002",
       div: "P-002",
-      time: "2026-04-21T10:30:00.000Z",
+      capturedAt: "2026-04-21T10:30:00.000Z",
       result: "FAIL",
       threshold: 0.12,
       prob: 0.98,
@@ -54,7 +59,8 @@ test("migration plan is noop for already normalized records", () => {
     }
   });
 
-  assert.equal(plan.status, "noop");
+  assert.equal(plan.status, "update");
+  assert.equal(plan.metadata?.version, "v1");
 });
 
 test("migration plan skips documents missing required canonical fields", () => {
@@ -63,7 +69,7 @@ test("migration plan skips documents missing required canonical fields", () => {
     imageId: "sample-3",
     metadata: {
       product_id: "PRD-30003",
-      time: "2026-04-21T10:45:00.000Z",
+      capturedAt: "2026-04-21T10:45:00.000Z",
       result: "REVIEW"
     }
   });

@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { CatalogRecord, IngestOutcome } from "@cuchen/shared";
-import { buildThumbnailKey, extractAliasValues } from "@cuchen/shared";
+import type { CatalogRecord, IngestOutcome } from "../../shared.js";
+import { buildThumbnailKey, extractAliasValues } from "../../shared.js";
 import { loadAppConfig } from "../../common/config/app-config.js";
 import { BLOB_STORAGE, CATALOG_REPOSITORY } from "../../storage/storage.tokens.js";
 import type { CatalogRepository } from "../../catalog/domain/catalog.repository.js";
@@ -83,6 +83,7 @@ export class IngestService implements OnModuleInit {
     const jsonRaw = await fs.readFile(candidate.jsonPath, "utf8");
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
     const metadata = extractAliasValues(parsed);
+    metadata.size ??= imageBuffer.length;
     const imageId = buildImageId(candidate.relativeKey, imageBuffer);
     const ext = candidate.fileExt.replace(".", "") as "png" | "jpg" | "jpeg";
     const record: CatalogRecord = {

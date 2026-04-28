@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import type { HydratedDocument } from "mongoose";
-import type { ImageExtension, MetadataDocument, SyncStatus } from "@cuchen/shared";
+import type { ImageExtension, MetadataDocument, SyncStatus } from "../../../shared.js";
 
 export const CATALOG_MODEL_NAME = "CatalogRecord";
 
@@ -46,7 +46,13 @@ export class CatalogMetadataDocument implements MetadataDocument {
   lotNo?: string;
 
   @Prop()
-  cameraId?: string;
+  processId?: string;
+
+  @Prop()
+  version?: string;
+
+  @Prop()
+  size?: number;
 
   [key: string]: unknown;
 }
@@ -112,7 +118,9 @@ CatalogSchema.index({ "metadata.result": 1 });
 CatalogSchema.index({ "metadata.threshold": 1 });
 CatalogSchema.index({ "metadata.prob": 1 });
 CatalogSchema.index({ "metadata.lotNo": 1 });
-CatalogSchema.index({ "metadata.cameraId": 1 });
+CatalogSchema.index({ "metadata.processId": 1 });
+CatalogSchema.index({ "metadata.version": 1 });
+CatalogSchema.index({ "metadata.size": 1 });
 
 export type CatalogMongoDocumentHydrated = HydratedDocument<CatalogMongoDocument>;
 

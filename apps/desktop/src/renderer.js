@@ -828,10 +828,12 @@ function renderMetadata(record) {
     ["time", formatTimeValue(metadata.time)],
     ["result", formatResultValue(metadata.result)],
     ["threshold", formatNumberValue(metadata.threshold)],
-    ["prob", formatNumberValue(metadata.prob)]
+    ["prob", formatNumberValue(metadata.prob)],
+    ["processId", metadata.processId],
+    ["version", metadata.version]
   ];
   const extraFields = Object.entries(metadataSource)
-    .filter(([key]) => !new Set(["product_id", "productId", "productNo", "div", "time", "capturedAt", "captured_at", "result", "aiResult", "threshold", "prob", "score", "confidence"]).has(key))
+    .filter(([key]) => !new Set(["product_id", "productId", "productNo", "div", "time", "capturedAt", "captured_at", "result", "aiResult", "threshold", "prob", "score", "confidence", "processId", "process_id", "process", "version", "metadataVersion", "metadata_version"]).has(key))
     .map(([key, value]) => [`metadata.${key}`, value]);
   return renderKeyValues([...orderedFields, ...extraFields], {
     emptyText: "메타데이터가 없습니다."
@@ -940,7 +942,9 @@ function getCanonicalMetadata(record) {
     time: pickFirstDefined(source, ["time", "capturedAt", "captured_at", "shotAt"]),
     result: pickFirstDefined(source, ["result", "aiResult", "inspectionResult"]),
     threshold: pickFirstDefined(source, ["threshold", "inspectionThreshold"]),
-    prob: pickFirstDefined(source, ["prob", "confidence", "score"])
+    prob: pickFirstDefined(source, ["prob", "confidence", "score"]),
+    processId: pickFirstDefined(source, ["processId", "process_id", "process", "cameraId", "camera_id", "camera"]),
+    version: pickFirstDefined(source, ["version", "metadataVersion", "metadata_version"])
   };
 }
 

@@ -18,8 +18,8 @@
 
 ## Conversation Summary
 - 사용자는 하위 에이전트를 사용해 기획, 명세, 개발계획을 통합한 총 계획 작성을 요청했다.
-- 현재 워크스페이스는 새 구조(`apps/backend`, `apps/desktop`, `packages/shared`, `infra/docker`) 기준으로 정리되어 있다.
-- 기존 프로토타입은 `legacy/minio-prototype/`에 보관하는 방향을 유지한다.
+- 현재 워크스페이스는 새 구조(`apps/backend`, `apps/frontend`, `apps/desktop`, `infra/docker`) 기준으로 정리되어 있다.
+- 별도 shared package와 legacy prototype 디렉터리는 현재 구조에서 제거됐다.
 
 ## Changes
 - 아키텍처, 구현, 배포, 운영 메모를 종합한 `docs/master-plan.md`를 추가했다.
@@ -30,7 +30,7 @@
 - 하위 에이전트 4개의 결과를 상호 모순 없는 형태로 통합했다.
 
 ## Risks / Open Items
-- `packages/shared`의 실제 타입/스키마 구조는 아직 미정이다.
+- backend 내부 타입/스키마 구조는 `apps/backend/src/shared.ts` 기준으로 관리한다.
 - `apps/backend`와 `apps/desktop`의 실제 scaffold는 아직 생성되지 않았다.
 - Docker Compose와 설치기 상세 설계는 다음 스텝에서 구체화해야 한다.
 

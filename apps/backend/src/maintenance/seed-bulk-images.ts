@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { Client } from "minio";
 import mongoose, { type Model } from "mongoose";
 import sharp from "sharp";
-import { buildThumbnailKey, type CatalogRecord, type MetadataDocument } from "@cuchen/shared";
+import { buildThumbnailKey, type CatalogRecord, type MetadataDocument } from "../shared.js";
 import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../images/application/thumbnail.js";
 import { loadAppConfig } from "../common/config/app-config.js";
 import { CATALOG_MODEL_NAME, createCatalogSchema, type CatalogMongoDocument } from "../catalog/infrastructure/mongo/catalog.schema.js";
@@ -358,7 +358,8 @@ function buildSeedPayload(index: number, bucketName: string, prefix: string, ima
     threshold,
     prob,
     lotNo: `LOT-${String(((productIndex - 1) % 200) + 1).padStart(3, "0")}`,
-    cameraId: cameraIdForDivision(division),
+    processId: processIdForDivision(division),
+    version: "seed-v1",
     size: imageBytes,
     source: "bulk-seed",
     seedPrefix: prefix,
@@ -397,11 +398,11 @@ function buildSeedPayload(index: number, bucketName: string, prefix: string, ima
   return { record, recordJson };
 }
 
-function cameraIdForDivision(division: string): string {
-  if (division === "top") return "CAM-TOP";
-  if (division === "bot") return "CAM-BOT";
-  if (division === "top-inf") return "CAM-TOP-INF";
-  return "CAM-BOT-INF";
+function processIdForDivision(division: string): string {
+  if (division === "top") return "PROC-TOP";
+  if (division === "bot") return "PROC-BOT";
+  if (division === "top-inf") return "PROC-TOP-INF";
+  return "PROC-BOT-INF";
 }
 
 async function uploadSeedPayload(
@@ -413,18 +414,34 @@ async function uploadSeedPayload(
   contentType: "image/jpeg"
 ): Promise<void> {
   await Promise.all([
-    client.putObject(bucketName, payload.record.imageKey, imageBuffer, imageBuffer.length, { "Content-Type": contentType }),
+    client.putObject(bucketName, payload.record.imageKey, imageBuffer, imageBuffer.length, {
+      "Content-Type": contentType,
+      ...buildObjectUserMetadata(payload.record)
+    }),
     client.putObject(bucketName, payload.record.thumbnailKey ?? buildThumbnailKey(payload.record.imageId), thumbnailBuffer, thumbnailBuffer.length, {
-      "Content-Type": THUMBNAIL_CONTENT_TYPE
+      "Content-Type": THUMBNAIL_CONTENT_TYPE,
+      ...buildObjectUserMetadata(payload.record)
     }),
     client.putObject(bucketName, payload.record.rawJsonKey ?? `records/${payload.record.imageId}.json`, payload.recordJson, payload.recordJson.length, {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...buildObjectUserMetadata(payload.record)
     })
   ]);
 }
 
 function hashBuffer(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+function buildObjectUserMetadata(record: CatalogRecord): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(record.metadata)
+      .filter((entry): entry is [string, string | number | boolean] => {
+        const [, value] = entry;
+        return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+      })
+      .map(([key, value]) => [`X-Amz-Meta-${key}`, String(value)])
+  );
 }
 
 async function mapWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {

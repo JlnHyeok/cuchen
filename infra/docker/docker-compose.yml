@@ -42,9 +42,7 @@ services:
   backend:
     build:
       context: ../../apps/backend
-      dockerfile: ../../infra/docker/backend.Dockerfile
-      additional_contexts:
-        shared: ../../packages/shared
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - .env

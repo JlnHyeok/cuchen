@@ -21,6 +21,8 @@ async function main(): Promise<void> {
         result: "",
         threshold: "",
         lotNo: "",
+        processId: "",
+        version: "",
         cameraId: ""
       }
     }
@@ -28,7 +30,7 @@ async function main(): Promise<void> {
 
   // eslint-disable-next-line no-console
   console.log(
-    `[prune] matched=${result.matchedCount} modified=${result.modifiedCount} removed=productNo,capturedAt,processCode,result,threshold,lotNo,cameraId`
+    `[prune] matched=${result.matchedCount} modified=${result.modifiedCount} removed=productNo,capturedAt,processCode,result,threshold,lotNo,processId,version,cameraId`
   );
   await mongoose.disconnect();
 }

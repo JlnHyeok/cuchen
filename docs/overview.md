@@ -13,9 +13,7 @@
 - 새 백엔드 구현은 `apps/backend/`에서 시작한다.
 - 최종 프론트엔드 구현은 `apps/frontend/`의 SvelteKit에서 진행한다.
 - Electron 데스크톱 앱은 `apps/desktop/`에 둔다.
-- 공용 타입과 계약은 `packages/shared/`로 모은다.
 - Docker 배포 파일은 `infra/docker/`에서 관리한다.
-- 기존 프로토타입은 `legacy/minio-prototype/`에 보관한다.
 
 ## 아키텍처
 투트랙 구조를 사용한다.

@@ -10,8 +10,7 @@
 - 이 폴더의 기본 역할은 실행 규칙이 아니라 프로젝트 명세, 계획, 리뷰 문서화다.
 
 ## 워크스페이스 기준
-- 실제 구현은 `apps/backend/`, `apps/frontend/`, `packages/shared/`, `infra/docker/`를 기준으로 진행한다.
-- 기존 JS/MinIO 프로토타입은 `legacy/minio-prototype/`에 보관한다.
+- 실제 구현은 `apps/backend/`, `apps/frontend/`, `apps/desktop/`, `infra/docker/`를 기준으로 진행한다.
 - `apps/desktop/`은 Electron 데스크톱 앱으로 유지하지만 최종 프론트엔드 방향은 `apps/frontend/`의 SvelteKit이다.
 
 ## 구성

@@ -47,12 +47,12 @@
   - 프로젝트가 backend 기준으로 부팅된다.
 
 ### Step B2
-- `packages/shared` 계약 반영
+- backend API 계약 반영
 - 산출물:
   - DTO 연결
   - validation 파이프
 - 종료 기준:
-  - backend 응답 shape가 shared와 일치한다.
+  - backend 응답 shape가 문서화된 HTTP 계약과 일치한다.
 
 ### Step B3
 - MongoDB repository와 MinIO adapter 구현

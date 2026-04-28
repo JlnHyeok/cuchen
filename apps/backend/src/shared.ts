@@ -16,7 +16,9 @@ export interface MetadataDocument {
   threshold?: number;
   prob?: number;
   lotNo?: string;
-  cameraId?: string;
+  processId?: string;
+  version?: string;
+  size?: number;
   [key: string]: unknown;
 }
 
@@ -43,7 +45,8 @@ export interface SearchFilters {
   processCode?: string;
   result?: string;
   lotNo?: string;
-  cameraId?: string;
+  processId?: string;
+  version?: string;
   productPage?: boolean;
   query?: string;
   capturedAtFrom?: string;
@@ -78,6 +81,7 @@ export interface IngestOutcome {
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 1000;
+export const DEFAULT_METADATA_VERSION = "v1";
 
 const FIELD_ALIASES: Record<string, readonly string[]> = {
   productNo: ["productNo", "productNumber", "sku", "제품번호", "품번"],
@@ -86,8 +90,12 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
   result: ["result", "aiResult", "inspectionResult", "판정결과", "ai판정결과", "검사결과"],
   threshold: ["threshold", "inspectionThreshold", "임계치", "검사시임계치", "검사임계치"],
   lotNo: ["lotNo", "lot_no", "lot", "lotNumber", "lot_number"],
-  cameraId: ["cameraId", "camera_id", "camera", "카메라", "카메라ID"]
+  processId: ["processId", "process_id", "process", "공정ID", "공정 ID", "cameraId", "camera_id", "camera", "카메라", "카메라ID"],
+  version: ["version", "metadataVersion", "metadata_version", "버전"],
+  size: ["size", "fileSize", "sizeBytes"]
 };
+
+const NUMERIC_METADATA_FIELDS = new Set(["threshold", "prob", "size"]);
 
 export function normalizePagination(input: Partial<PaginationQuery>): PaginationQuery {
   const page = typeof input.page === "number" && Number.isFinite(input.page) && input.page > 0 ? Math.floor(input.page) : DEFAULT_PAGE;
@@ -97,11 +105,11 @@ export function normalizePagination(input: Partial<PaginationQuery>): Pagination
 }
 
 export function normalizeMetadata(source: Record<string, unknown>): MetadataDocument {
-  const metadata: MetadataDocument = {};
+  const metadata: MetadataDocument = { version: DEFAULT_METADATA_VERSION };
   for (const [target, aliases] of Object.entries(FIELD_ALIASES)) {
     const value = pickFirst(source, aliases);
     if (value !== undefined) {
-      metadata[target] = target === "threshold" ? toNumberOrUndefined(value) : value;
+      metadata[target] = NUMERIC_METADATA_FIELDS.has(target) ? toNumberOrUndefined(value) : value;
     }
   }
 
@@ -133,7 +141,8 @@ export function buildSearchText(record: CatalogRecord): string {
     record.metadata.processCode,
     record.metadata.result,
     record.metadata.lotNo,
-    record.metadata.cameraId
+    record.metadata.processId,
+    record.metadata.version
   ];
   return parts.filter(Boolean).map((value) => String(value).toLowerCase()).join(" ");
 }

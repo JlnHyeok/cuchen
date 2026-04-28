@@ -16,14 +16,10 @@ apps/
     generated/  백엔드 감시 폴더와 임시 입력 데이터
   frontend/     SvelteKit 프론트엔드
   desktop/      Electron 데스크톱 앱
-packages/
-  shared/       공용 타입, DTO, 스키마, validation
 infra/
   docker/       Docker Compose, 배포 파일
 docs/           명세, 계획, 리뷰, 운영 규칙
 artifacts/      로그, 보고서, 벤치마크 결과
-legacy/
-  minio-prototype/  기존 프로토타입 보관
 ```
 
 각 프로젝트는 자기 폴더의 `package.json`, lock, `node_modules`를 따로 관리한다.
@@ -58,18 +54,11 @@ legacy/
 - 체크 기반 다중 다운로드
 - 최종 사용자 UI
 
-### Shared
-- DTO
-- API 응답 타입
-- metadata schema
-- pagination/sort/filter 타입
-- validation 규칙
-
 ## 4. 선행 결정사항
 - MongoDB를 메타데이터의 단일 정본으로 확정한다.
 - MinIO는 이미지 원본의 단일 정본으로 확정한다.
 - `result`, `aiResult`, `processCode`, `metadata` 필드 규칙을 구현 전에 고정한다.
-- backend와 frontend가 같은 DTO를 쓰도록 `packages/shared`를 계약 원천으로 둔다.
+- backend와 frontend는 문서화된 HTTP API 계약을 기준으로 연동한다.
 - 배포 기본형은 `backend = Docker`, `frontend = SvelteKit` 분리 배포로 둔다.
 - 폴더 감시 기반 자동 동기화 파이프라인을 backend의 기본 ingest 흐름으로 확정한다.
 
@@ -90,15 +79,8 @@ legacy/
 - metadata schema, object key 규칙, collection 구조, 기본 API 표면을 고정한다.
 - 종료 기준:
   - backend와 frontend가 같은 계약 문서를 기준으로 움직인다.
-  - `legacy` 코드는 참조용으로만 남고 새 구현 기준이 되지 않는다.
 
-### Phase 1. Shared 계약 패키지
-- `packages/shared`에 DTO, metadata schema, filter/pagination 타입, error shape를 만든다.
-- backend와 frontend가 shared 계약 없이는 진행하지 않도록 한다.
-- 종료 기준:
-  - 목록, 상세, 검색, ingest 결과 DTO가 모두 shared에 있다.
-
-### Phase 2. Backend 골격
+### Phase 1. Backend 골격
 - `apps/backend`에 NestJS 기본 구조를 만든다.
 - 우선 모듈:
   - `HealthModule`
@@ -109,7 +91,7 @@ legacy/
 - 종료 기준:
   - `/health`, `/images`, `/images/:id`, `/images/:id/metadata`, `/images/:id/download`, `/ingest/scan`의 기본 뼈대가 준비된다.
 
-### Phase 3. 저장소 계층
+### Phase 2. 저장소 계층
 - MongoDB repository와 MinIO adapter를 분리한다.
 - ingest는 `watch/scan -> pair match -> stabilize -> parse -> normalize -> MongoDB upsert -> MinIO put` 순서로 오케스트레이션한다.
 - partial write와 idempotency를 설계한다.
@@ -117,7 +99,7 @@ legacy/
   - 같은 `imageId` 기준으로 MongoDB와 MinIO에 일관되게 저장된다.
   - 실패 상태가 숨겨지지 않고 추적 가능하다.
 
-### Phase 4. 목록/검색 API
+### Phase 3. 목록/검색 API
 - MongoDB 기반 페이지네이션, 필터, 정렬, 상세 메타데이터 조회 API를 완성한다.
 - `tags`, `공정코드`, `판정 결과`, 날짜 범위를 우선 지원한다.
 - 종료 기준:
@@ -239,20 +221,18 @@ legacy/
   - 다음 에이전트 핸드오프 확인
 - 반려 기준:
   - MongoDB와 MinIO의 역할이 섞인 경우
-  - shared 계약 없이 backend/frontend가 각자 DTO를 만든 경우
+  - backend/frontend가 HTTP API 계약 문서와 다르게 동작하는 경우
   - partial write를 성공처럼 처리한 경우
   - 로그 없이 다음 단계로 넘어간 경우
 
 ## 8. 즉시 시작 순서
-1. `packages/shared` 초안 작성
-2. `apps/backend` NestJS skeleton 작성
-3. MongoDB/MinIO 저장 계약 문서 확정
-4. `apps/frontend` SvelteKit UI 정리
-5. Docker Compose 초안 작성
+1. `apps/backend` NestJS skeleton 작성
+2. MongoDB/MinIO 저장 계약 문서 확정
+3. `apps/frontend` SvelteKit UI 정리
+4. Docker Compose 초안 작성
 
 ## 9. 주요 리스크
 - MongoDB와 MinIO 사이의 상태 불일치
-- shared 계약 없이 backend와 frontend가 따로 진화하는 문제
+- HTTP API 계약 없이 backend와 frontend가 따로 진화하는 문제
 - 25,000건에서 frontend가 전체 데이터를 들고 있어 느려지는 문제
 - Docker로 backend 스택을 묶었지만 frontend 연결이 복잡해지는 문제
-- legacy 프로토타입을 새 기준처럼 다시 참조하는 문제

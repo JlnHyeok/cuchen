@@ -1,5 +1,5 @@
-import type { CatalogRecord, MetadataDocument } from "@cuchen/shared";
-import { buildThumbnailKey } from "@cuchen/shared";
+import type { CatalogRecord, MetadataDocument } from "../../../shared.js";
+import { buildThumbnailKey } from "../../../shared.js";
 
 export function buildMetadataDocument(document: { metadata?: MetadataDocument } & Record<string, unknown>): MetadataDocument {
   const metadata: MetadataDocument = { ...(document.metadata ?? {}) };
@@ -18,7 +18,8 @@ export function buildMetadataDocument(document: { metadata?: MetadataDocument } 
     "threshold",
     "prob",
     "lotNo",
-    "cameraId"
+    "processId",
+    "version"
   ] as const;
   for (const key of legacyKeys) {
     const value = document[key];

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { setTimeout as delay } from "node:timers/promises";
 import { Readable } from "node:stream";
-import type { CatalogRecord } from "@cuchen/shared";
+import type { CatalogRecord } from "../../shared.js";
 import { CATALOG_REPOSITORY, BLOB_STORAGE } from "../../storage/storage.tokens.js";
 import { loadAppConfig } from "../../common/config/app-config.js";
 import type { CatalogRepository } from "../../catalog/domain/catalog.repository.js";

@@ -86,7 +86,3 @@ MinIO에 이미 데이터가 있고 MongoDB가 비어 있거나 어긋난 경우
 2. `.env.example`을 복사해서 `.env`를 준비한다.
 3. `docker compose --env-file .env up -d`
 4. 다시 `cd ../../apps/backend && npm run dev`
-
-## 주의
-- 기존 프로토타입 코드는 `legacy/minio-prototype/`에 있다.
-- 새 구현은 여기서부터 다시 시작한다.

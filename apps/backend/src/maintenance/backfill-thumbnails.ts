@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Client } from "minio";
 import mongoose, { type Model } from "mongoose";
-import { buildThumbnailKey } from "@cuchen/shared";
+import { buildThumbnailKey } from "../shared.js";
 import { loadAppConfig } from "../common/config/app-config.js";
 import { CATALOG_MODEL_NAME, createCatalogSchema, type CatalogMongoDocument } from "../catalog/infrastructure/mongo/catalog.schema.js";
 import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../images/application/thumbnail.js";

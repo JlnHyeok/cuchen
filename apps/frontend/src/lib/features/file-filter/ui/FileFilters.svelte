@@ -64,7 +64,7 @@
   </label>
 
   <label>
-    <span>공정</span>
+    <span>공정 ID</span>
     <select bind:value={process} disabled={disabled}>
       <option value="">전체</option>
       {#each options.processes as option}

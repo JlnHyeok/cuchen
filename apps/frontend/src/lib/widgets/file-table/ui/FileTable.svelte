@@ -57,7 +57,7 @@
         <th class="file-name-col">제품번호</th>
         <th class="result-cell">AI 품질 판정</th>
         <th class="metadata-date-col">촬영일시</th>
-        <th class="metadata-process-col">공정</th>
+        <th class="metadata-process-col">공정 ID</th>
         <th class="metadata-list-col">Version</th>
         <th class="size-col">크기</th>
         <th class="action-col">상세</th>

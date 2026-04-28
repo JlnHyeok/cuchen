@@ -52,10 +52,13 @@
 - `result`
 - `threshold`
 - `lotNo`
-- `cameraId`
+- `processId`
+- `version`
 - `title`
 - `inspectorModel`
 - `inspectedAt`
+
+입력 JSON에 version이 없으면 백엔드는 `metadata.version`을 기본 `v1`로 저장한다.
 
 ### 2.3 스트리밍 예외
 
@@ -78,6 +81,8 @@
 | `GET` | `/images/:imageId/blob` | 원본 이미지 스트리밍 |
 | `GET` | `/images/:imageId/thumbnail` | 썸네일 스트리밍 |
 | `GET` | `/images/:imageId/download` | 파일 저장용 원본 이미지 반환 |
+
+MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.version` 값이 있으면 user metadata `X-Amz-Meta-Version`에 같은 값을 포함한다.
 
 ## 4. 상세 명세
 
@@ -145,7 +150,8 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 | `result` | `string` | 판정 결과 |
 | `aiResult` | `string` | 이전 호환 필드 |
 | `lotNo` | `string` | LOT 번호 포함 검색 |
-| `cameraId` | `string` | 카메라 ID 포함 검색 |
+| `processId` | `string` | 공정 ID 포함 검색 |
+| `version` | `string` | metadata version 포함 검색 |
 | `query` | `string` | 파일명 및 메타데이터 통합 검색어 |
 | `capturedAtFrom` | `string` | 촬영일시 시작 |
 | `capturedAtTo` | `string` | 촬영일시 종료 |

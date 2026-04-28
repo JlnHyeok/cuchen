@@ -28,7 +28,11 @@ export class SearchRequestDto {
 
   @IsOptional()
   @IsString()
-  cameraId?: string;
+  processId?: string;
+
+  @IsOptional()
+  @IsString()
+  version?: string;
 
   @IsOptional()
   @IsString()

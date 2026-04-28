@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common";
-import { normalizePagination, type SearchQuery } from "@cuchen/shared";
+import { normalizePagination, type SearchQuery } from "../../shared.js";
 import { CatalogService } from "../application/catalog.service.js";
 import { SearchRequestDto } from "./dto/search.request.dto.js";
 
@@ -17,7 +17,8 @@ export class CatalogController {
       processCode: query.processCode,
       result: query.result ?? query.aiResult,
       lotNo: query.lotNo,
-      cameraId: query.cameraId,
+      processId: query.processId,
+      version: query.version,
       productPage: query.productPage === "1" || query.productPage === "true",
       query: query.query,
       capturedAtFrom: query.capturedAtFrom,

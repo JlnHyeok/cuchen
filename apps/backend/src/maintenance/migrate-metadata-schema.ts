@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { pathToFileURL } from "node:url";
 import type { Model } from "mongoose";
+import { DEFAULT_METADATA_VERSION } from "../shared.js";
 
 type PlainRecord = Record<string, unknown>;
 
@@ -32,8 +33,8 @@ interface MigrationDocument {
 }
 
 const BATCH_SIZE = 500;
-const CANONICAL_KEYS = ["product_id", "div", "time", "result", "threshold", "prob"] as const;
-const REQUIRED_KEYS = ["product_id", "div", "time", "result", "threshold"] as const;
+const CANONICAL_KEYS = ["product_id", "div", "capturedAt", "result", "threshold", "prob", "processId", "version", "size"] as const;
+const REQUIRED_KEYS = ["product_id", "div", "capturedAt", "result", "threshold"] as const;
 const METADATA_ALIAS_KEYS = new Set([
   "product_id",
   "productId",
@@ -56,7 +57,19 @@ const METADATA_ALIAS_KEYS = new Set([
   "inspectionScore",
   "threshold",
   "inspectionThreshold",
-  "inspection_threshold"
+  "inspection_threshold",
+  "processId",
+  "process_id",
+  "process",
+  "cameraId",
+  "camera_id",
+  "camera",
+  "version",
+  "metadataVersion",
+  "metadata_version",
+  "size",
+  "fileSize",
+  "sizeBytes"
 ]);
 const ROOT_ALIAS_KEYS = [
   "product_id",
@@ -80,7 +93,19 @@ const ROOT_ALIAS_KEYS = [
   "inspectionScore",
   "threshold",
   "inspectionThreshold",
-  "inspection_threshold"
+  "inspection_threshold",
+  "processId",
+  "process_id",
+  "process",
+  "cameraId",
+  "camera_id",
+  "camera",
+  "version",
+  "metadataVersion",
+  "metadata_version",
+  "size",
+  "fileSize",
+  "sizeBytes"
 ];
 
 async function main(): Promise<void> {
@@ -143,7 +168,19 @@ async function main(): Promise<void> {
         inspectionProb: 1,
         inspectionScore: 1,
         inspectionThreshold: 1,
-        inspection_threshold: 1
+        inspection_threshold: 1,
+        processId: 1,
+        process_id: 1,
+        process: 1,
+        cameraId: 1,
+        camera_id: 1,
+        camera: 1,
+        version: 1,
+        metadataVersion: 1,
+        metadata_version: 1,
+        size: 1,
+        fileSize: 1,
+        sizeBytes: 1
       }
     )
       .sort({ updatedAt: 1, imageId: 1 })
@@ -294,10 +331,10 @@ function buildNextMetadata(document: MigrationDocument, currentMetadata: PlainRe
       readValue(document, currentMetadata, ["processCode", "process_code"])
     )
   );
-  const time = normalizeTime(
+  const capturedAt = normalizeTime(
     firstDefined(
-      readValue(document, currentMetadata, ["time"]),
-      readValue(document, currentMetadata, ["capturedAt", "captured_at"])
+      readValue(document, currentMetadata, ["capturedAt", "captured_at"]),
+      readValue(document, currentMetadata, ["time"])
     )
   );
   const result = normalizeResult(
@@ -324,18 +361,33 @@ function buildNextMetadata(document: MigrationDocument, currentMetadata: PlainRe
       readValue(document, currentMetadata, ["inspectionScore"])
     )
   );
+  const processId = normalizeText(
+    firstDefined(
+      readValue(document, currentMetadata, ["processId", "process_id", "process"]),
+      readValue(document, currentMetadata, ["cameraId", "camera_id", "camera"])
+    )
+  );
+  const version = normalizeText(readValue(document, currentMetadata, ["version", "metadataVersion", "metadata_version"])) ?? DEFAULT_METADATA_VERSION;
+  const size = normalizeNumber(readValue(document, currentMetadata, ["size", "fileSize", "sizeBytes"]));
 
   const nextMetadata: PlainRecord = {
     ...passthrough,
     product_id: productId,
     div,
-    time,
+    capturedAt,
     result,
     threshold
   };
 
   if (prob !== undefined) {
     nextMetadata.prob = prob;
+  }
+  if (processId !== undefined) {
+    nextMetadata.processId = processId;
+  }
+  nextMetadata.version = version;
+  if (size !== undefined) {
+    nextMetadata.size = size;
   }
 
   return nextMetadata;

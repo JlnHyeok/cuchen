@@ -6,7 +6,7 @@ const BACKEND_PAGE_SIZE = 1000;
 const IMAGE_DIVS: ImageDiv[] = ['top', 'bot', 'top-inf', 'bot-inf'];
 const INSPECTION_RESULTS: InspectionResult[] = ['OK', 'NG'];
 const IMAGE_DIV_ORDER = new Map<ImageDiv, number>(IMAGE_DIVS.map((div, index) => [div, index]));
-const PROCESS_KEYS = ['process', 'processCode', 'process_code', 'processName', 'process_name'];
+const PROCESS_KEYS = ['processId', 'process_id', 'process', 'processName', 'process_name', 'cameraId', 'camera_id', 'camera'];
 const VERSION_KEYS = ['version', 'Version', 'modelVersion', 'model_version', 'inspectionVersion', 'inspection_version', 'recipeVersion', 'recipe_version'];
 
 interface ApiEnvelope<T> {
@@ -123,8 +123,8 @@ function toBackendSearchQuery(query: Partial<FileListQuery>, page: number, pageS
     pageSize,
     productNo: query.productId,
     lotNo: query.lotNo,
-    cameraId: query.cameraId,
-    processCode: query.process ?? query.div,
+    processId: query.process ?? query.processId,
+    processCode: query.div,
     version: query.version,
     result: query.result,
     capturedAtFrom: toDateStart(query.dateFrom),
@@ -225,7 +225,7 @@ function toFileListItem(record: CatalogRecord): FileListItem {
     prob: readNumber(metadata, ['prob', 'probability', 'confidence', 'score', 'aiProb', 'inspectionProb', 'inspectionScore'], 0),
     sizeBytes: readNumber(metadata, ['size', 'fileSize', 'sizeBytes'], 0),
     lotNo: readString(metadata, ['lotNo', 'lot_no', 'lot', 'lotNumber', 'lot_number']),
-    cameraId: readString(metadata, ['cameraId', 'camera_id', 'camera'])
+    processId: process
   };
 }
 
@@ -234,7 +234,7 @@ function matchesClientFilters(file: FileListItem, query: Partial<FileListQuery>)
   if (query.process && file.process !== query.process) return false;
   if (query.version && file.version !== query.version) return false;
   if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
-  if (query.cameraId && !file.cameraId?.toLowerCase().includes(query.cameraId.toLowerCase())) return false;
+  if (query.processId && !file.processId?.toLowerCase().includes(query.processId.toLowerCase())) return false;
   if (query.div && file.div !== query.div) return false;
   if (query.result && file.result !== query.result) return false;
   if (query.dateFrom && file.time.slice(0, 10) < query.dateFrom) return false;
@@ -300,7 +300,7 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
         time: latestTime(sorted),
         sizeBytes: sorted.reduce((sum, file) => sum + file.sizeBytes, 0),
         lotNos: uniqueValues(sorted.map((file) => file.lotNo)),
-        cameraIds: uniqueValues(sorted.map((file) => file.cameraId)),
+        processIds: uniqueValues(sorted.map((file) => file.processId)),
         okCount,
         ngCount
       };

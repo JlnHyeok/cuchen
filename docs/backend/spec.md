@@ -50,7 +50,8 @@
   - `result`
   - `aiResult`
   - `lotNo`
-  - `cameraId`
+  - `processId`
+  - `version`
   - `query`
   - `capturedAtFrom`
   - `capturedAtTo`
@@ -105,12 +106,15 @@ MongoDB는 조회 정본 문서만 저장한다.
 - `result`
 - `threshold`
 - `lotNo`
-- `cameraId`
+- `processId`
+- `version`
+- 입력 JSON에 version이 없으면 기본 `v1`로 저장한다.
 
 ### MinIO 객체
 - `images/{imageId}.{ext}`
 - `thumbnails/{imageId}.webp`
 - `metadata/{imageId}.json` (예약 경로, 현재 객체 업로드 미구현)
+- `metadata.version` 값이 있으면 이미지, 썸네일, metadata JSON 객체의 MinIO user metadata `X-Amz-Meta-Version`에 같은 값을 저장한다.
 
 ## ingest 흐름
 1. 입력 폴더에서 이미지와 JSON을 basename 기준으로 pair 매칭한다.
