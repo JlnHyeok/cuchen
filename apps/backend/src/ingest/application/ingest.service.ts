@@ -124,6 +124,8 @@ export class IngestService implements OnModuleInit {
       ignored: /(^|[\\/])\../,
       ignoreInitial: true,
       persistent: true,
+      usePolling: this.config.ingestWatchUsePolling,
+      interval: this.config.ingestWatchIntervalMs,
       awaitWriteFinish: {
         stabilityThreshold: this.config.stabilityDelayMs,
         pollInterval: 100

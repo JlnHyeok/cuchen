@@ -18,3 +18,27 @@ test("default ingest root resolves under backend root, not src", () => {
     }
   }
 });
+
+test("ingest watcher polling options are configurable", () => {
+  const originalUsePolling = process.env.INGEST_WATCH_USE_POLLING;
+  const originalInterval = process.env.INGEST_WATCH_INTERVAL_MS;
+  process.env.INGEST_WATCH_USE_POLLING = "true";
+  process.env.INGEST_WATCH_INTERVAL_MS = "750";
+
+  try {
+    const config = loadAppConfig();
+    assert.equal(config.ingestWatchUsePolling, true);
+    assert.equal(config.ingestWatchIntervalMs, 750);
+  } finally {
+    if (originalUsePolling === undefined) {
+      delete process.env.INGEST_WATCH_USE_POLLING;
+    } else {
+      process.env.INGEST_WATCH_USE_POLLING = originalUsePolling;
+    }
+    if (originalInterval === undefined) {
+      delete process.env.INGEST_WATCH_INTERVAL_MS;
+    } else {
+      process.env.INGEST_WATCH_INTERVAL_MS = originalInterval;
+    }
+  }
+});
