@@ -3,13 +3,12 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 ENV CI=true
-ARG VITE_BACKEND_URL=http://127.0.0.1:3000
-ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
 
 COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY svelte.config.js tsconfig.json vite.config.ts ./
+COPY .env* ./
 COPY src ./src
 
 RUN npm run build
