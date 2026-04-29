@@ -8,8 +8,6 @@ export interface AppConfig {
   corsOrigins: string[];
   storageMode: "memory" | "mongo-minio";
   ingestRootDir: string;
-  scanIntervalMs: number;
-  stabilityChecks: number;
   stabilityDelayMs: number;
   testIoDelayMs: number;
   minioEndpoint: string;
@@ -56,8 +54,6 @@ export function loadAppConfig(): AppConfig {
     corsOrigins: splitList(process.env.CORS_ORIGIN),
     storageMode: process.env.STORAGE_MODE === "mongo-minio" ? "mongo-minio" : "memory",
     ingestRootDir: resolveBackendPath(process.env.INGEST_ROOT_DIR, "generated/inbox"),
-    scanIntervalMs: toNumber(process.env.SCAN_INTERVAL_MS, 5000),
-    stabilityChecks: toNumber(process.env.STABILITY_CHECKS, 2),
     stabilityDelayMs: toNumber(process.env.STABILITY_DELAY_MS, 500),
     testIoDelayMs: toNumber(process.env.TEST_IO_DELAY_MS, 0),
     minioEndpoint: process.env.MINIO_ENDPOINT ?? "http://127.0.0.1:9000",
