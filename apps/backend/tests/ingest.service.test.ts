@@ -79,6 +79,56 @@ test("scanAndIngest walks nested directories", async () => {
   assert.equal(searchResult.items[0]?.metadata.size, Buffer.from(SAMPLE_PNG_BASE64, "base64").length);
 });
 
+test("ingest service upserts duplicate product and div from different paths", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-dedupe-"));
+  const firstDir = path.join(rootDir, "first");
+  const secondDir = path.join(rootDir, "second");
+  await fs.mkdir(firstDir, { recursive: true });
+  await fs.mkdir(secondDir, { recursive: true });
+  const firstImagePath = path.join(firstDir, "sample.png");
+  const firstJsonPath = path.join(firstDir, "sample.json");
+  const secondImagePath = path.join(secondDir, "sample.png");
+  const secondJsonPath = path.join(secondDir, "sample.json");
+  const imageBuffer = Buffer.from(SAMPLE_PNG_BASE64, "base64");
+  const metadata = {
+    product_id: "PRD-30003",
+    div: "top",
+    capturedAt: "2026-04-21T11:00:00.000Z",
+    result: "OK",
+    threshold: 0.9
+  };
+  await fs.writeFile(firstImagePath, imageBuffer);
+  await fs.writeFile(firstJsonPath, JSON.stringify(metadata));
+  await fs.writeFile(secondImagePath, imageBuffer);
+  await fs.writeFile(secondJsonPath, JSON.stringify({ ...metadata, capturedAt: "2026-04-21T11:05:00.000Z" }));
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const firstRecord = await service.syncPair({
+    relativeKey: "first/sample",
+    imagePath: firstImagePath,
+    jsonPath: firstJsonPath,
+    fileName: "sample",
+    fileExt: ".png"
+  });
+  const secondRecord = await service.syncPair({
+    relativeKey: "second/sample",
+    imagePath: secondImagePath,
+    jsonPath: secondJsonPath,
+    fileName: "sample",
+    fileExt: ".png"
+  });
+
+  assert.equal(firstRecord.imageId, "prd-30003-top");
+  assert.equal(secondRecord.imageId, "prd-30003-top");
+  const searchResult = await catalog.search({ productNo: "PRD-30003" }, 1, 20);
+  assert.equal(searchResult.total, 1);
+  assert.equal(searchResult.items[0]?.metadata.capturedAt, "2026-04-21T11:05:00.000Z");
+});
+
 test("memory catalog search supports canonical metadata fields", async () => {
   const catalog = new MemoryCatalogRepository();
   await catalog.init();

@@ -84,7 +84,7 @@ export class IngestService implements OnModuleInit {
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
     const metadata = extractAliasValues(parsed);
     metadata.size ??= imageBuffer.length;
-    const imageId = buildImageId(candidate.relativeKey, imageBuffer);
+    const imageId = buildImageId(metadata, candidate.relativeKey, imageBuffer);
     const ext = candidate.fileExt.replace(".", "") as "png" | "jpg" | "jpeg";
     const record: CatalogRecord = {
       imageId,
@@ -198,8 +198,33 @@ function collectPairs(rootDir: string, files: string[]): PairCandidate[] {
     }));
 }
 
-function buildImageId(relativeKey: string, imageBuffer: Buffer): string {
+function buildImageId(metadata: Record<string, unknown>, relativeKey: string, imageBuffer: Buffer): string {
+  const productId = readText(metadata.product_id) ?? readText(metadata.productId) ?? readText(metadata.productNo);
+  const div = readText(metadata.div);
+  if (productId && div) {
+    return `${normalizeIdPart(productId)}-${normalizeIdPart(div)}`;
+  }
+
   return `${path.basename(relativeKey, path.extname(relativeKey))}-${hashBuffer(Buffer.concat([Buffer.from(relativeKey), imageBuffer])).slice(0, 12)}`;
+}
+
+function readText(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
+function normalizeIdPart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function hashBuffer(buffer: Buffer): string {
