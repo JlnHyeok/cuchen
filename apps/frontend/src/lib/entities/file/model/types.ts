@@ -24,8 +24,6 @@ export interface FileListItem {
   fileCount?: number;
   process?: string;
   processes?: string[];
-  processCode?: string;
-  processCodes?: string[];
   version?: string;
   versions?: string[];
   time: string;

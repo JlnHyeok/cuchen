@@ -6,8 +6,7 @@ const BACKEND_PAGE_SIZE = 1000;
 const IMAGE_DIVS: ImageDiv[] = ['top', 'bot', 'top-inf', 'bot-inf'];
 const INSPECTION_RESULTS: InspectionResult[] = ['OK', 'NG'];
 const IMAGE_DIV_ORDER = new Map<ImageDiv, number>(IMAGE_DIVS.map((div, index) => [div, index]));
-const PROCESS_CODE_KEYS = ['processCode', 'process_code', '공정코드', '공정 코드'];
-const PROCESS_ID_KEYS = ['processId', 'process_id', 'process', 'processName', 'process_name', 'cameraId', 'camera_id', 'camera'];
+const PROCESS_ID_KEYS = ['processId'];
 const VERSION_KEYS = ['version', 'Version', 'modelVersion', 'model_version', 'inspectionVersion', 'inspection_version', 'recipeVersion', 'recipe_version'];
 
 interface ApiEnvelope<T> {
@@ -148,7 +147,7 @@ function toBackendSearchQuery(query: Partial<FileListQuery>, page: number, pageS
     productNo: query.productId,
     lotNo: query.lotNo,
     processId: query.processId,
-    processCode: query.div,
+    div: query.div,
     version: query.version,
     result: query.result,
     query: query.process,
@@ -233,11 +232,6 @@ function normalizeTime(value: string | undefined, record: CatalogRecord): string
   return value || record.updatedAt || record.createdAt || new Date(0).toISOString();
 }
 
-function normalizeDisplayProcess(processCode: string | undefined, processId: string | undefined): string | undefined {
-  if (processCode && !isImageDiv(processCode)) return processCode;
-  return processId ?? processCode;
-}
-
 function withExtension(fileName: string, fileExt: string): string {
   const ext = fileExt.replace(/^\./, '').toLowerCase();
   if (!ext || fileName.toLowerCase().endsWith(`.${ext}`)) return fileName;
@@ -252,11 +246,10 @@ function toFileListItem(record: CatalogRecord): FileListItem {
   const metadata = record.metadata ?? {};
   const baseName = record.fileName || record.imageId;
   const fileName = withExtension(baseName, record.fileExt);
-  const productId = readString(metadata, ['product_id', 'productId', 'productNo']) || productIdFromName(baseName || record.imageId);
-  const processCode = readString(metadata, PROCESS_CODE_KEYS);
+  const productId = readString(metadata, ['productId']) || productIdFromName(baseName || record.imageId);
   const processId = readString(metadata, PROCESS_ID_KEYS);
-  const div = normalizeImageDiv(readString(metadata, ['div']) ?? (isImageDiv(processCode) ? processCode : undefined), `${baseName} ${record.imageId}`);
-  const process = normalizeDisplayProcess(processCode, processId);
+  const div = normalizeImageDiv(readString(metadata, ['div']), `${baseName} ${record.imageId}`);
+  const process = processId;
   const version = readString(metadata, VERSION_KEYS);
   const result = normalizeInspectionResult(readString(metadata, ['result', 'aiResult', 'inspectionResult']));
 
@@ -266,7 +259,6 @@ function toFileListItem(record: CatalogRecord): FileListItem {
     productId,
     div,
     process,
-    processCode,
     processId,
     version,
     time: normalizeTime(readString(metadata, ['time', 'capturedAt', 'captured_at']), record),
@@ -280,7 +272,7 @@ function toFileListItem(record: CatalogRecord): FileListItem {
 
 function matchesClientFilters(file: FileListItem, query: Partial<FileListQuery>): boolean {
   if (query.productId && file.productId !== query.productId) return false;
-  if (query.process && ![file.process, file.processCode, file.processId].some((value) => value?.toLowerCase().includes(query.process!.toLowerCase()))) return false;
+  if (query.process && ![file.process, file.processId].some((value) => value?.toLowerCase().includes(query.process!.toLowerCase()))) return false;
   if (query.version && file.version !== query.version) return false;
   if (query.lotNo && !file.lotNo?.toLowerCase().includes(query.lotNo.toLowerCase())) return false;
   if (query.processId && !file.processId?.toLowerCase().includes(query.processId.toLowerCase())) return false;
@@ -329,7 +321,6 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
       const minProbFile = [...sorted].filter((file) => Number.isFinite(file.prob)).sort((left, right) => left.prob - right.prob)[0] ?? sorted[0];
       const representative = sorted.find((file) => file.result === 'NG') ?? minProbFile;
       const thresholds = sorted.map((file) => file.threshold);
-      const processCodes = uniqueValues(sorted.map((file) => file.processCode));
       const processes = uniqueValues(sorted.map((file) => file.process));
       const versions = uniqueValues(sorted.map((file) => file.version));
 
@@ -340,8 +331,6 @@ function groupProductRows(items: FileListItem[]): FileListItem[] {
         fileCount: sorted.length,
         process: processes[0] ?? representative.process,
         processes,
-        processCode: processCodes[0] ?? representative.processCode,
-        processCodes,
         version: versions[0] ?? representative.version,
         versions,
         result,

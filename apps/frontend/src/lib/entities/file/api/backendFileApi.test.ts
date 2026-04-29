@@ -10,10 +10,9 @@ function catalogRecord(productIndex: number, div: string) {
     fileName: `${productId}-${div}`,
     fileExt: 'png',
     metadata: {
-      product_id: productId,
+      productId,
       div,
-      processCode: '압력검사',
-      processId: 'PROC-01',
+      processId: '압력검사',
       version: 'v1',
       time: `2026-04-${String((productIndex % 20) + 1).padStart(2, '0')}T09:00:00.000Z`,
       result: 'OK',
@@ -186,9 +185,7 @@ describe('backendFileApi', () => {
       bucket: 'test-bucket',
       fileName: `bulk-0001-${div}`,
       fileExt: 'jpg',
-      metadata: {
-        source: 'minio-reconcile'
-      },
+      metadata: {},
       createdAt: '2026-04-01T00:00:00.000Z',
       updatedAt: '2026-04-01T00:00:00.000Z'
     }));
@@ -303,7 +300,10 @@ describe('backendFileApi', () => {
       'PRD-0001/PRD-0001-top.png'
     ]);
     expect(new TextDecoder().decode(entries['PRD-0001/PRD-0001-top.png'])).toBe('image:PRD-0001-top');
-    expect(metadata.product_id).toBe('PRD-0001');
+    expect(metadata.productId).toBe('PRD-0001');
+    expect(metadata.product_id).toBeUndefined();
+    expect(metadata.processCode).toBeUndefined();
+    expect(metadata.source).toBeUndefined();
     expect(metadata.div).toBe('top');
   });
 });
