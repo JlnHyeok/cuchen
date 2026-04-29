@@ -7,12 +7,6 @@ export const CATALOG_MODEL_NAME = "CatalogRecord";
 @Schema({ _id: false, versionKey: false, strict: false })
 export class CatalogMetadataDocument implements MetadataDocument {
   @Prop()
-  productNo?: string;
-
-  @Prop()
-  product_id?: string;
-
-  @Prop()
   productId?: string;
 
   @Prop()
@@ -23,12 +17,6 @@ export class CatalogMetadataDocument implements MetadataDocument {
 
   @Prop()
   time?: string;
-
-  @Prop()
-  processCode?: string;
-
-  @Prop()
-  process_code?: string;
 
   @Prop()
   div?: string;
@@ -105,17 +93,15 @@ export class CatalogMongoDocument {
 }
 
 export const CatalogSchema = SchemaFactory.createForClass(CatalogMongoDocument);
-CatalogSchema.index({ "metadata.productNo": 1 });
-CatalogSchema.index({ "metadata.product_id": 1 });
 CatalogSchema.index({ "metadata.productId": 1 });
 CatalogSchema.index(
-  { "metadata.product_id": 1, "metadata.div": 1 },
+  { "metadata.productId": 1, "metadata.div": 1 },
   {
     unique: true,
     name: "unique_product_id_div_ci",
     collation: { locale: "en", strength: 2 },
     partialFilterExpression: {
-      "metadata.product_id": { $type: "string" },
+      "metadata.productId": { $type: "string" },
       "metadata.div": { $type: "string" }
     }
   }
@@ -123,8 +109,6 @@ CatalogSchema.index(
 CatalogSchema.index({ "metadata.capturedAt": 1 });
 CatalogSchema.index({ "metadata.captured_at": 1 });
 CatalogSchema.index({ "metadata.time": 1 });
-CatalogSchema.index({ "metadata.processCode": 1 });
-CatalogSchema.index({ "metadata.process_code": 1 });
 CatalogSchema.index({ "metadata.div": 1 });
 CatalogSchema.index({ "metadata.result": 1 });
 CatalogSchema.index({ "metadata.threshold": 1 });

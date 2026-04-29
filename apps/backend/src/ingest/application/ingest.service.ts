@@ -214,7 +214,7 @@ function collectPairs(rootDir: string, files: string[]): PairCandidate[] {
 }
 
 function buildImageId(metadata: Record<string, unknown>, relativeKey: string, imageBuffer: Buffer): string {
-  const productId = readText(metadata.product_id) ?? readText(metadata.productId) ?? readText(metadata.productNo);
+  const productId = readText(metadata.productId);
   const div = readText(metadata.div);
   if (productId && div) {
     return `${normalizeIdPart(productId)}-${normalizeIdPart(div)}`;

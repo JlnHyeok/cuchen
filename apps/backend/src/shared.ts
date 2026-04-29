@@ -3,14 +3,10 @@ export type ImageExtension = "png" | "jpg" | "jpeg";
 export type SyncStatus = "pending" | "synced" | "partial" | "failed" | "missing-source";
 
 export interface MetadataDocument {
-  productNo?: string;
-  product_id?: string;
   productId?: string;
   capturedAt?: string;
   captured_at?: string;
   time?: string;
-  processCode?: string;
-  process_code?: string;
   div?: string;
   result?: string;
   threshold?: number;
@@ -42,7 +38,7 @@ export interface CatalogRecord {
 export interface SearchFilters {
   bucket?: string;
   productNo?: string;
-  processCode?: string;
+  div?: string;
   result?: string;
   lotNo?: string;
   processId?: string;
@@ -84,9 +80,8 @@ export const MAX_PAGE_SIZE = 1000;
 export const DEFAULT_METADATA_VERSION = "v1";
 
 const FIELD_ALIASES: Record<string, readonly string[]> = {
-  productNo: ["productNo", "productNumber", "sku", "제품번호", "품번"],
+  productId: ["productId", "product_id", "productNo", "productNumber", "sku", "제품번호", "품번"],
   capturedAt: ["capturedAt", "captured_at", "shotAt", "shot_at", "촬영일시", "촬영시간"],
-  processCode: ["processCode", "process_code", "공정코드", "공정 코드"],
   result: ["result", "aiResult", "inspectionResult", "판정결과", "ai판정결과", "검사결과"],
   threshold: ["threshold", "inspectionThreshold", "임계치", "검사시임계치", "검사임계치"],
   lotNo: ["lotNo", "lot_no", "lot", "lotNumber", "lot_number"],
@@ -96,6 +91,7 @@ const FIELD_ALIASES: Record<string, readonly string[]> = {
 };
 
 const NUMERIC_METADATA_FIELDS = new Set(["threshold", "prob", "size"]);
+const DROPPED_METADATA_FIELDS = new Set(["source", "processCode", "process_code"]);
 
 export function normalizePagination(input: Partial<PaginationQuery>): PaginationQuery {
   const page = typeof input.page === "number" && Number.isFinite(input.page) && input.page > 0 ? Math.floor(input.page) : DEFAULT_PAGE;
@@ -117,7 +113,7 @@ export function normalizeMetadata(source: Record<string, unknown>): MetadataDocu
     if (value === undefined || value === null) {
       continue;
     }
-    if (isAliasKey(key)) {
+    if (isAliasKey(key) || DROPPED_METADATA_FIELDS.has(key)) {
       continue;
     }
     metadata[key] = value;
@@ -134,11 +130,8 @@ export function buildSearchText(record: CatalogRecord): string {
   const parts = [
     record.imageId,
     record.fileName,
-    record.metadata.product_id,
     record.metadata.productId,
-    record.metadata.productNo,
     record.metadata.div,
-    record.metadata.processCode,
     record.metadata.result,
     record.metadata.lotNo,
     record.metadata.processId,

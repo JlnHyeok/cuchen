@@ -25,7 +25,7 @@ test("migration plan converts legacy fields to canonical metadata", () => {
     lotNo: "LOT-001",
     processId: "CAM-01",
     version: "v1",
-    product_id: "PRD-10001",
+    productId: "PRD-10001",
     div: "P-001",
     capturedAt: "2026-04-21T10:00:00.000Z",
     result: "PASS",
@@ -49,7 +49,7 @@ test("migration plan adds default version to already normalized records", () => 
     _id: "2",
     imageId: "sample-2",
     metadata: {
-      product_id: "PRD-20002",
+      productId: "PRD-20002",
       div: "P-002",
       capturedAt: "2026-04-21T10:30:00.000Z",
       result: "FAIL",
@@ -68,7 +68,7 @@ test("migration plan skips documents missing required canonical fields", () => {
     _id: "3",
     imageId: "sample-3",
     metadata: {
-      product_id: "PRD-30003",
+      productId: "PRD-30003",
       capturedAt: "2026-04-21T10:45:00.000Z",
       result: "REVIEW"
     }

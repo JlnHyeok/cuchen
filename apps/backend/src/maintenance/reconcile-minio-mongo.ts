@@ -154,7 +154,6 @@ function buildCatalogDocument(bucketName: string, object: MinioListObject) {
     thumbnailKey: buildThumbnailKey(imageId),
     rawJsonKey: undefined,
     metadata: {
-      source: "minio-reconcile",
       contentType: fileExt === "jpg" || fileExt === "jpeg" ? "image/jpeg" : "image/png",
       size,
       etag,

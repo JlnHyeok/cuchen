@@ -33,8 +33,8 @@ interface MigrationDocument {
 }
 
 const BATCH_SIZE = 500;
-const CANONICAL_KEYS = ["product_id", "div", "capturedAt", "result", "threshold", "prob", "processId", "version", "size"] as const;
-const REQUIRED_KEYS = ["product_id", "div", "capturedAt", "result", "threshold"] as const;
+const CANONICAL_KEYS = ["productId", "div", "capturedAt", "result", "threshold", "prob", "processId", "version", "size"] as const;
+const REQUIRED_KEYS = ["productId", "div", "capturedAt", "result", "threshold"] as const;
 const METADATA_ALIAS_KEYS = new Set([
   "product_id",
   "productId",
@@ -69,7 +69,8 @@ const METADATA_ALIAS_KEYS = new Set([
   "metadata_version",
   "size",
   "fileSize",
-  "sizeBytes"
+  "sizeBytes",
+  "source"
 ]);
 const ROOT_ALIAS_KEYS = [
   "product_id",
@@ -105,7 +106,8 @@ const ROOT_ALIAS_KEYS = [
   "metadata_version",
   "size",
   "fileSize",
-  "sizeBytes"
+  "sizeBytes",
+  "source"
 ];
 
 async function main(): Promise<void> {
@@ -372,7 +374,7 @@ function buildNextMetadata(document: MigrationDocument, currentMetadata: PlainRe
 
   const nextMetadata: PlainRecord = {
     ...passthrough,
-    product_id: productId,
+    productId,
     div,
     capturedAt,
     result,

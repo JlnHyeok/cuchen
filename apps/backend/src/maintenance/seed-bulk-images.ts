@@ -345,14 +345,10 @@ function buildSeedPayload(index: number, bucketName: string, prefix: string, ima
   const prob = isNg ? 0.62 : 0.93 + (productIndex % 6) * 0.01;
   const threshold = 0.8;
   const metadata: MetadataDocument = {
-    productNo,
-    product_id: productNo,
     productId: productNo,
     capturedAt: now,
     captured_at: now,
     time: now,
-    processCode: division,
-    process_code: division,
     div: division,
     result: isNg ? "NG" : "OK",
     threshold,
@@ -361,7 +357,6 @@ function buildSeedPayload(index: number, bucketName: string, prefix: string, ima
     processId: processIdForDivision(division),
     version: "seed-v1",
     size: imageBytes,
-    source: "bulk-seed",
     seedPrefix: prefix,
     contentType: "image/jpeg"
   };
@@ -388,8 +383,8 @@ function buildSeedPayload(index: number, bucketName: string, prefix: string, ima
       rawJsonKey: record.rawJsonKey,
       meta: metadata,
       tag: {
-        productNo,
-        processCode: division,
+        productId: productNo,
+        div: division,
         result: metadata.result
       }
     })

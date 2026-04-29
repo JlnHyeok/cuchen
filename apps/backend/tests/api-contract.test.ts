@@ -63,9 +63,9 @@ before(async () => {
     thumbnailKey: `thumbnails/${imageId}.webp`,
     rawJsonKey: `metadata/${imageId}.json`,
     metadata: {
-      productNo: "PRD-10001",
+      productId: "PRD-10001",
       capturedAt: "2026-04-21T10:00:00.000Z",
-      processCode: "P-001",
+      div: "top",
       result: "PASS",
       threshold: 0.42,
       lotNo: "LOT-001",
@@ -176,8 +176,8 @@ test("search endpoint paginates by product rows when productPage is enabled", as
         fileName: `${productNo}-${div}`,
         metadata: {
           ...seed.record.metadata,
-          productNo,
-          processCode: div
+          productId: productNo,
+          div
         },
         updatedAt: `2026-04-${String((productIndex % 20) + 1).padStart(2, "0")}T00:00:00.000Z`
       });
@@ -194,7 +194,7 @@ test("search endpoint paginates by product rows when productPage is enabled", as
       items: Array<{ metadata?: Record<string, unknown> }>;
     };
   };
-  const rowProductNos = new Set(body.data.items.map((item) => String(item.metadata?.productNo ?? "")));
+  const rowProductNos = new Set(body.data.items.map((item) => String(item.metadata?.productId ?? "")));
 
   assert.equal(body.success, true);
   assert.equal(body.data.total, 25);

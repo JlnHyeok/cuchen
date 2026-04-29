@@ -79,17 +79,7 @@ export class MongoCatalogRepository implements CatalogRepository {
       }
     };
     const productIdExpression = {
-      $ifNull: [
-        "$metadata.product_id",
-        {
-          $ifNull: [
-            "$metadata.productId",
-            {
-              $ifNull: ["$metadata.productNo", fallbackProductIdExpression]
-            }
-          ]
-        }
-      ]
+      $ifNull: ["$metadata.productId", fallbackProductIdExpression]
     };
     const productKeyExpression = { $toLower: productIdExpression };
 
@@ -178,19 +168,13 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
       $or: [
         { imageId: { $regex: escaped, $options: "i" } },
         { fileName: { $regex: escaped, $options: "i" } },
-        { "metadata.productNo": { $regex: escaped, $options: "i" } },
-        { "metadata.product_id": { $regex: escaped, $options: "i" } },
         { "metadata.productId": { $regex: escaped, $options: "i" } }
       ]
     });
   }
-  if (filters.processCode) {
+  if (filters.div) {
     andConditions.push({
-      $or: [
-        { "metadata.processCode": filters.processCode },
-        { "metadata.process_code": filters.processCode },
-        { "metadata.div": filters.processCode }
-      ]
+      "metadata.div": filters.div
     });
   }
   if (filters.result) query["metadata.result"] = { $in: resultAliases(filters.result) };
@@ -253,12 +237,8 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
       $or: [
         { imageId: { $regex: escaped, $options: "i" } },
         { fileName: { $regex: escaped, $options: "i" } },
-        { "metadata.product_id": { $regex: escaped, $options: "i" } },
         { "metadata.productId": { $regex: escaped, $options: "i" } },
-        { "metadata.productNo": { $regex: escaped, $options: "i" } },
         { "metadata.div": { $regex: escaped, $options: "i" } },
-        { "metadata.process_code": { $regex: escaped, $options: "i" } },
-        { "metadata.processCode": { $regex: escaped, $options: "i" } },
         { "metadata.result": { $regex: escaped, $options: "i" } },
         { "metadata.lotNo": { $regex: escaped, $options: "i" } },
         { "metadata.processId": { $regex: escaped, $options: "i" } },
@@ -277,7 +257,7 @@ function escapeRegExp(value: string): string {
 }
 
 function buildDuplicateFilter(record: CatalogRecord): Record<string, unknown> | null {
-  const productId = readFirstMetadataString(record.metadata, ["product_id", "productId", "productNo"]);
+  const productId = readFirstMetadataString(record.metadata, ["productId"]);
   const div = readFirstMetadataString(record.metadata, ["div"]);
   if (!productId || !div) {
     return null;
@@ -286,11 +266,7 @@ function buildDuplicateFilter(record: CatalogRecord): Record<string, unknown> | 
   return {
     $and: [
       {
-        $or: [
-          { "metadata.product_id": exactCaseInsensitive(productId) },
-          { "metadata.productId": exactCaseInsensitive(productId) },
-          { "metadata.productNo": exactCaseInsensitive(productId) }
-        ]
+        "metadata.productId": exactCaseInsensitive(productId)
       },
       { "metadata.div": exactCaseInsensitive(div) }
     ]

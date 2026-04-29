@@ -66,7 +66,7 @@ function productPage(records: CatalogRecord[], page: number, pageSize: number): 
 }
 
 function productIdForRecord(record: CatalogRecord): string {
-  return readFirstString(record.metadata ?? {}, ["product_id", "productId", "productNo"]) || productIdFromName(record.fileName || record.imageId);
+  return readFirstString(record.metadata ?? {}, ["productId"]) || productIdFromName(record.fileName || record.imageId);
 }
 
 function productIdFromName(value: string): string {
@@ -84,7 +84,7 @@ function matchesFilters(record: CatalogRecord, filters: SearchFilters): boolean 
     const needle = filters.productNo.trim().toLowerCase();
     if (!productIdForRecord(record).toLowerCase().includes(needle)) return false;
   }
-  if (filters.processCode && readFirstString(metadata, ["processCode", "process_code", "div"]) !== filters.processCode) return false;
+  if (filters.div && readFirstString(metadata, ["div"]) !== filters.div) return false;
   if (filters.result && !matchesResult(String(metadata.result ?? ""), filters.result)) return false;
   if (filters.lotNo && !readFirstString(metadata, ["lotNo", "lot_no", "lot", "lotNumber", "lot_number"]).toLowerCase().includes(filters.lotNo.toLowerCase())) return false;
   if (filters.processId && !readFirstString(metadata, ["processId", "process_id", "process", "processName", "process_name"]).toLowerCase().includes(filters.processId.toLowerCase())) return false;
@@ -118,7 +118,7 @@ function matchesFilters(record: CatalogRecord, filters: SearchFilters): boolean 
 }
 
 function findDuplicateRecordIds(records: CatalogRecord[], record: CatalogRecord): string[] {
-  const productId = readFirstString(record.metadata ?? {}, ["product_id", "productId", "productNo"]).toLowerCase();
+  const productId = readFirstString(record.metadata ?? {}, ["productId"]).toLowerCase();
   const div = readFirstString(record.metadata ?? {}, ["div"]).toLowerCase();
   if (!productId || !div) {
     return [];
@@ -126,7 +126,7 @@ function findDuplicateRecordIds(records: CatalogRecord[], record: CatalogRecord)
 
   return records
     .filter((candidate) => {
-      const candidateProductId = readFirstString(candidate.metadata ?? {}, ["product_id", "productId", "productNo"]).toLowerCase();
+      const candidateProductId = readFirstString(candidate.metadata ?? {}, ["productId"]).toLowerCase();
       const candidateDiv = readFirstString(candidate.metadata ?? {}, ["div"]).toLowerCase();
       return candidateProductId === productId && candidateDiv === div;
     })

@@ -14,7 +14,7 @@ export class CatalogController {
       ...pagination,
       bucket: query.bucket,
       productNo: query.productNo,
-      processCode: query.processCode,
+      div: query.div,
       result: query.result ?? query.aiResult,
       lotNo: query.lotNo,
       processId: query.processId,

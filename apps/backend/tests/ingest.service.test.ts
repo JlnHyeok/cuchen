@@ -16,9 +16,9 @@ test("ingest service stores metadata and blob in memory mode", async () => {
   await fs.writeFile(
     jsonPath,
     JSON.stringify({
-      productNo: "PRD-10001",
+      productId: "PRD-10001",
       capturedAt: "2026-04-21T10:00:00.000Z",
-      processCode: "P-001",
+      div: "top",
       result: "PASS",
       threshold: 0.42,
       lotNo: "LOT-001",
@@ -42,9 +42,53 @@ test("ingest service stores metadata and blob in memory mode", async () => {
   assert.equal(record.syncStatus, "synced");
   const loaded = await catalog.findById(record.imageId);
   assert.ok(loaded);
-  assert.equal(loaded?.metadata.productNo, "PRD-10001");
+  assert.equal(loaded?.metadata.productId, "PRD-10001");
+  assert.equal(loaded?.metadata.product_id, undefined);
+  assert.equal(loaded?.metadata.processCode, undefined);
   assert.equal(loaded?.metadata.version, "v1");
   assert.equal(loaded?.metadata.size, imageBuffer.length);
+});
+
+test("ingest service normalizes metadata to productId and processId only", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-metadata-contract-"));
+  const imagePath = path.join(rootDir, "sample.png");
+  const jsonPath = path.join(rootDir, "sample.json");
+  await fs.writeFile(imagePath, Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+  await fs.writeFile(
+    jsonPath,
+    JSON.stringify({
+      product_id: "PRD-LEGACY-001",
+      div: "bot-inf",
+      time: "2026-04-29T13:45:00.000Z",
+      processCode: "P2-BOT-INF",
+      processId: "PROC2-BOT-INF",
+      result: "OK",
+      threshold: 0.78,
+      prob: 0.89,
+      source: "legacy-source"
+    })
+  );
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const record = await service.syncPair({
+    relativeKey: "sample",
+    imagePath,
+    jsonPath,
+    fileName: "sample",
+    fileExt: ".png"
+  });
+
+  assert.equal(record.imageId, "prd-legacy-001-bot-inf");
+  assert.equal(record.metadata.productId, "PRD-LEGACY-001");
+  assert.equal(record.metadata.processId, "PROC2-BOT-INF");
+  assert.equal(record.metadata.product_id, undefined);
+  assert.equal(record.metadata.processCode, undefined);
+  assert.equal(record.metadata.process_code, undefined);
+  assert.equal(record.metadata.source, undefined);
 });
 
 test("scanAndIngest walks nested directories", async () => {
@@ -55,9 +99,9 @@ test("scanAndIngest walks nested directories", async () => {
   await fs.writeFile(
     path.join(nestedDir, "sample.json"),
     JSON.stringify({
-      productNo: "PRD-20002",
+      productId: "PRD-20002",
       capturedAt: "2026-04-21T10:30:00.000Z",
-      processCode: "P-002",
+      div: "bot",
       result: "FAIL",
       threshold: 0.12
     })
@@ -91,7 +135,7 @@ test("ingest service upserts duplicate product and div from different paths", as
   const secondJsonPath = path.join(secondDir, "sample.json");
   const imageBuffer = Buffer.from(SAMPLE_PNG_BASE64, "base64");
   const metadata = {
-    product_id: "PRD-30003",
+    productId: "PRD-30003",
     div: "top",
     capturedAt: "2026-04-21T11:00:00.000Z",
     result: "OK",
@@ -140,7 +184,7 @@ test("ingest service dedupes product and div case-insensitively", async () => {
   await fs.writeFile(
     firstJsonPath,
     JSON.stringify({
-      product_id: "PRD-Case-001",
+      productId: "PRD-Case-001",
       div: "TOP",
       capturedAt: "2026-04-21T12:00:00.000Z",
       result: "OK",
@@ -151,7 +195,7 @@ test("ingest service dedupes product and div case-insensitively", async () => {
   await fs.writeFile(
     secondJsonPath,
     JSON.stringify({
-      product_id: "prd-case-001",
+      productId: "prd-case-001",
       div: "top",
       capturedAt: "2026-04-21T12:05:00.000Z",
       result: "OK",
@@ -199,7 +243,7 @@ test("memory catalog search supports canonical metadata fields", async () => {
     imageKey: "images/canonical-01.png",
     thumbnailKey: "thumbnails/canonical-01.webp",
     metadata: {
-      product_id: "CUCHEN-00001",
+      productId: "CUCHEN-00001",
       div: "top",
       time: "2026-04-21T10:00:00.000Z",
       result: "PASS",
@@ -220,7 +264,7 @@ test("memory catalog search supports canonical metadata fields", async () => {
       lotNo: "LOT",
       processId: "PROC",
       version: "v1",
-      processCode: "top",
+      div: "top",
       capturedAtFrom: "2026-04-21T00:00:00.000Z",
       capturedAtTo: "2026-04-21T23:59:59.999Z",
       result: "OK"
@@ -254,7 +298,7 @@ test("memory catalog search supports product-level pagination", async () => {
   const firstPage = await catalog.search({ productPage: true }, 1, 1);
   assert.equal(firstPage.total, 2);
   assert.equal(firstPage.totalData, 3);
-  assert.deepEqual(firstPage.items.map((item) => item.metadata.product_id), ["PRODUCT-B"]);
+  assert.deepEqual(firstPage.items.map((item) => item.metadata.productId), ["PRODUCT-B"]);
 
   const secondPage = await catalog.search({ productPage: true }, 2, 1);
   assert.equal(secondPage.total, 2);
@@ -328,7 +372,7 @@ function createCatalogRecord(imageId: string, productId: string, div: string, up
     imageKey: `images/${imageId}.png`,
     thumbnailKey: `thumbnails/${imageId}.webp`,
     metadata: {
-      product_id: productId,
+      productId,
       div,
       time: updatedAt,
       result: "PASS",
@@ -350,9 +394,7 @@ function createFileNameFallbackRecord(imageId: string, updatedAt: string) {
     contentHash: "hash",
     imageKey: `images/${imageId}.jpg`,
     thumbnailKey: `thumbnails/${imageId}.webp`,
-    metadata: {
-      source: "minio-reconcile"
-    },
+    metadata: {},
     syncStatus: "synced" as const,
     createdAt: updatedAt,
     updatedAt

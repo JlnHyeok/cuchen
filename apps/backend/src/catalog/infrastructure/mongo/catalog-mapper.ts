@@ -5,14 +5,10 @@ export function buildMetadataDocument(document: { metadata?: MetadataDocument } 
   const metadata: MetadataDocument = { ...(document.metadata ?? {}) };
   const mutableMetadata = metadata as Record<string, unknown>;
   const legacyKeys = [
-    "productNo",
-    "product_id",
     "productId",
     "capturedAt",
     "captured_at",
     "time",
-    "processCode",
-    "process_code",
     "div",
     "result",
     "threshold",

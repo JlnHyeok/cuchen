@@ -163,8 +163,8 @@ function buildRawJsonPayload(record: CatalogRecord): Record<string, unknown> {
     rawJsonKey: record.rawJsonKey,
     meta: record.metadata,
     tag: {
-      productNo: record.metadata.productNo ?? record.metadata.product_id ?? record.metadata.productId,
-      processCode: record.metadata.processCode ?? record.metadata.process_code ?? record.metadata.div,
+      productId: record.metadata.productId,
+      div: record.metadata.div,
       result: record.metadata.result
     }
   };

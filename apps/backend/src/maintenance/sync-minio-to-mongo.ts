@@ -153,7 +153,6 @@ function buildCatalogDocument(bucketName: string, object: MinioListObject, image
     thumbnailKey: buildThumbnailKey(imageId),
     rawJsonKey: undefined,
     metadata: {
-      source: "minio-backfill",
       contentType: fileExt === "jpg" || fileExt === "jpeg" ? "image/jpeg" : "image/png",
       size,
       etag,
@@ -186,7 +185,6 @@ function buildCatalogDocumentFromRawJson(bucketName: string, object: MinioListOb
     rawJsonKey: `raw-json/${imageId}.json`,
     metadata: {
       ...metadata,
-      source: "minio-raw-json",
       contentType,
       size,
       etag,
@@ -219,7 +217,6 @@ function buildCatalogDocumentFromRecord(bucketName: string, object: MinioListObj
     rawJsonKey: typeof record.rawJsonKey === "string" ? record.rawJsonKey : `raw-json/${imageId}.json`,
     metadata: {
       ...metadata,
-      source: "minio-record",
       contentType,
       size,
       etag,

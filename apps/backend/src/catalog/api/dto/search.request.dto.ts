@@ -12,7 +12,7 @@ export class SearchRequestDto {
 
   @IsOptional()
   @IsString()
-  processCode?: string;
+  div?: string;
 
   @IsOptional()
   @IsString()
