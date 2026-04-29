@@ -39,6 +39,7 @@ interface SearchResponse {
 
 type QueryParams = Record<string, string | number | undefined>;
 type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
+type DownloadStartHandler = (productName: string) => void;
 
 export class BackendConnectionError extends Error {
   constructor() {
@@ -487,9 +488,11 @@ export async function getProductFiles(fileId: string): Promise<FileListItem[]> {
   return sortByImageDiv(group.length > 0 ? group : [selected]);
 }
 
-export async function downloadFile(fileId: string): Promise<{ blob: Blob; fileName: string }> {
+export async function downloadFile(fileId: string, onStart?: DownloadStartHandler): Promise<{ blob: Blob; fileName: string }> {
   const group = await getProductFiles(fileId);
-  return makeZip(group, `${sanitizeZipPathPart(group[0].productId)}.zip`);
+  const productName = sanitizeZipPathPart(group[0].productId);
+  onStart?.(productName);
+  return makeZip(group, `${productName}.zip`);
 }
 
 export async function downloadFiles(fileIds: string[], onProgress?: DownloadProgressHandler): Promise<{ blob: Blob; fileName: string }> {
