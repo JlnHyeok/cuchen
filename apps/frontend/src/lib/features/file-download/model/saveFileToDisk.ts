@@ -1,4 +1,4 @@
-import { downloadAllFiles, downloadFile, downloadFiles } from '@entities/file/api';
+import { downloadAllFiles, downloadFile } from '@entities/file/api';
 import type { FileListItem, FileListQuery } from '@entities/file/model';
 
 type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
@@ -34,10 +34,24 @@ export async function saveFileToDisk(file: FileListItem): Promise<{ canceled: bo
 }
 
 export async function saveSelectedFilesToDisk(fileIds: string[], onProgress?: DownloadProgressHandler): Promise<{ canceled: boolean; filePath?: string }> {
-  return saveWithPicker(`cuchen-selected-${fileIds.length}-products.zip`, async () => {
-    const { blob } = await downloadFiles(fileIds, onProgress);
-    return blob;
-  });
+  const uniqueFileIds = [...new Set(fileIds)];
+  if (uniqueFileIds.length === 0) {
+    throw new Error('선택된 제품이 없습니다.');
+  }
+
+  let completed = 0;
+  for (const fileId of uniqueFileIds) {
+    const { blob, fileName } = await downloadFile(fileId, (productName) => {
+      onProgress?.({ completed, total: uniqueFileIds.length, message: `${productName} 다운로드중 ${completed + 1}/${uniqueFileIds.length}` });
+    });
+    saveBlob(blob, fileName);
+    completed += 1;
+  }
+
+  return {
+    canceled: false,
+    filePath: `${completed}개 제품 ZIP`
+  };
 }
 
 export async function saveAllFilesToDisk(query: FileListQuery, totalProducts: number, onProgress?: DownloadProgressHandler): Promise<{ canceled: boolean; filePath?: string }> {

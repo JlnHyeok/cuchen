@@ -39,6 +39,18 @@ interface SearchResponse {
 
 type QueryParams = Record<string, string | number | undefined>;
 type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
+type DownloadStartHandler = (productName: string) => void;
+
+export class BackendConnectionError extends Error {
+  constructor() {
+    super('백엔드 서버에 연결할 수 없습니다.');
+    this.name = 'BackendConnectionError';
+  }
+}
+
+export function isBackendConnectionError(error: unknown): error is BackendConnectionError {
+  return error instanceof BackendConnectionError;
+}
 
 function getBackendBaseUrl(): string {
   const configured = import.meta.env.VITE_BACKEND_URL as string | undefined;
@@ -85,8 +97,19 @@ async function readErrorMessage(response: Response, fallbackMessage: string): Pr
   return fallbackMessage;
 }
 
+async function request(pathname: string, query: QueryParams = {}): Promise<Response> {
+  try {
+    return await fetch(buildUrl(pathname, query));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new BackendConnectionError();
+    }
+    throw error;
+  }
+}
+
 async function requestJson<T>(pathname: string, query: QueryParams = {}): Promise<T> {
-  const response = await fetch(buildUrl(pathname, query));
+  const response = await request(pathname, query);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, `요청에 실패했습니다: ${pathname}`));
   }
@@ -103,7 +126,7 @@ async function requestJson<T>(pathname: string, query: QueryParams = {}): Promis
 }
 
 async function requestBlob(pathname: string): Promise<Blob> {
-  const response = await fetch(buildUrl(pathname));
+  const response = await request(pathname);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, `파일을 불러오지 못했습니다: ${pathname}`));
   }
@@ -442,6 +465,10 @@ export async function getFilterOptions(): Promise<FilterOptions> {
   };
 }
 
+export async function checkBackendConnection(): Promise<void> {
+  await requestJson<unknown>('/health');
+}
+
 export async function getImageBlob(fileId: string): Promise<Blob> {
   return requestBlob(`/images/${encodeURIComponent(fileId)}/blob`);
 }
@@ -461,9 +488,11 @@ export async function getProductFiles(fileId: string): Promise<FileListItem[]> {
   return sortByImageDiv(group.length > 0 ? group : [selected]);
 }
 
-export async function downloadFile(fileId: string): Promise<{ blob: Blob; fileName: string }> {
+export async function downloadFile(fileId: string, onStart?: DownloadStartHandler): Promise<{ blob: Blob; fileName: string }> {
   const group = await getProductFiles(fileId);
-  return makeZip(group, `${sanitizeZipPathPart(group[0].productId)}.zip`);
+  const productName = sanitizeZipPathPart(group[0].productId);
+  onStart?.(productName);
+  return makeZip(group, `${productName}.zip`);
 }
 
 export async function downloadFiles(fileIds: string[], onProgress?: DownloadProgressHandler): Promise<{ blob: Blob; fileName: string }> {

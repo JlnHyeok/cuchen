@@ -52,7 +52,7 @@
     return Math.min(...finiteValues);
   }
 
-  $: detailColumnCount = Math.min(Math.max(items.length || 1, 1), 4);
+  $: detailColumnCount = loading ? 4 : Math.min(Math.max(items.length || 1, 1), 4);
   $: detailModalWidth = detailColumnCount * 420 + (detailColumnCount - 1) * 16 + 42;
   $: files = items.map((item) => item.file);
   $: commonCapturedAt = files.reduce((latest, file) => (file.time > latest ? file.time : latest), files[0]?.time ?? '');
@@ -82,9 +82,51 @@
         <button type="button" aria-label="닫기" on:click={onClose}>닫기</button>
       </header>
 
-      <div class="preview-body detail-preview-body">
+      <div class:detail-preview-loading={loading} class="preview-body detail-preview-body">
         {#if loading}
-          <p>제품 이미지와 메타데이터를 불러오는 중입니다.</p>
+          <div class="detail-loading-layout" aria-label="제품 이미지와 메타데이터를 불러오는 중입니다.">
+            <dl class="common-metadata detail-loading-metadata" aria-hidden="true">
+              <div class="common-field product-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+              <div class="common-field captured-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+              <div class="common-field process-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+              <div class="common-field version-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+              <div class="common-field quality-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value detail-skeleton-badge"></span></dd>
+              </div>
+              <div class="common-field probability-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+              <div class="common-field threshold-field detail-loading-field">
+                <dt><span class="detail-skeleton-line detail-skeleton-label"></span></dt>
+                <dd><span class="detail-skeleton-line detail-skeleton-value"></span></dd>
+              </div>
+            </dl>
+            <div class="detail-loading-grid" aria-hidden="true">
+              {#each Array(detailColumnCount) as _}
+                <div class="detail-loading-card">
+                  <div class="detail-loading-header"></div>
+                  <div class="detail-image-shell">
+                    <div class="detail-image-placeholder">이미지 불러오는 중...</div>
+                  </div>
+                  <div class="detail-loading-meta"></div>
+                </div>
+              {/each}
+            </div>
+          </div>
         {:else if error}
           <p class="error">{error}</p>
         {:else if items.length > 0}
