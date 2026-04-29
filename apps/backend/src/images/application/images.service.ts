@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { setTimeout as delay } from "node:timers/promises";
 import { Readable } from "node:stream";
 import type { CatalogRecord } from "../../shared.js";
@@ -10,6 +10,7 @@ import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "./thumbnail.js";
 
 @Injectable()
 export class ImagesService {
+  private readonly logger = new Logger(ImagesService.name);
   private readonly config = loadAppConfig();
   private readonly testIoDelayMs = this.config.testIoDelayMs;
 
@@ -19,27 +20,37 @@ export class ImagesService {
   ) {}
 
   async getMetadata(imageId: string) {
-    return this.getRecordOrThrow(imageId);
+    this.logger.log(`[images] metadata start imageId=${imageId}`);
+    const record = await this.getRecordOrThrow(imageId);
+    this.logger.log(`[images] metadata done imageId=${imageId}`);
+    return record;
   }
 
   async getDetail(imageId: string) {
-    return this.getRecordOrThrow(imageId);
+    this.logger.log(`[images] detail start imageId=${imageId}`);
+    const record = await this.getRecordOrThrow(imageId);
+    this.logger.log(`[images] detail done imageId=${imageId}`);
+    return record;
   }
 
   async getBlob(imageId: string) {
+    this.logger.log(`[images] blob start imageId=${imageId}`);
     const record = await this.getRecordOrThrow(imageId);
     const blob = await this.blobStorage.openImage(record);
     if (!blob) {
       throw new NotFoundException(`Image not found: ${imageId}`);
     }
+    this.logger.log(`[images] blob done imageId=${imageId} contentType=${blob.contentType}`);
     return blob;
   }
 
   async getThumbnail(imageId: string) {
+    this.logger.log(`[images] thumbnail start imageId=${imageId}`);
     const record = await this.getRecordOrThrow(imageId);
 
     const cached = await this.blobStorage.openThumbnail(record);
     if (cached) {
+      this.logger.log(`[images] thumbnail cache-hit imageId=${imageId}`);
       return cached;
     }
 
@@ -52,6 +63,7 @@ export class ImagesService {
     const thumbnailBuffer = await createThumbnailBuffer(sourceBuffer);
 
     await this.blobStorage.putThumbnail(record, thumbnailBuffer, THUMBNAIL_CONTENT_TYPE);
+    this.logger.log(`[images] thumbnail generated imageId=${imageId}`);
     return {
       stream: Readable.from([thumbnailBuffer]),
       contentType: THUMBNAIL_CONTENT_TYPE
@@ -60,7 +72,9 @@ export class ImagesService {
 
   async listBuckets() {
     const buckets = await this.catalogRepository.listBuckets();
-    return uniqueStrings([this.config.minioBucket, ...buckets]);
+    const result = uniqueStrings([this.config.minioBucket, ...buckets]);
+    this.logger.log(`[images] buckets listed count=${result.length}`);
+    return result;
   }
 
   private async getRecordOrThrow(imageId: string): Promise<CatalogRecord> {

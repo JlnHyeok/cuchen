@@ -16,6 +16,7 @@ import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../src/images/app
 import { ImagesService } from "../src/images/application/images.service.js";
 import { ApiExceptionFilter } from "../src/common/http/api-exception.filter.js";
 import { ApiResponseInterceptor } from "../src/common/http/api-response.interceptor.js";
+import { RequestLoggingInterceptor } from "../src/common/http/request-logging.interceptor.js";
 import { BLOB_STORAGE, CATALOG_REPOSITORY } from "../src/storage/storage.tokens.js";
 import { MemoryBlobStorage } from "../src/images/infrastructure/memory/blob.storage.js";
 import { MemoryCatalogRepository } from "../src/catalog/infrastructure/memory/catalog.repository.js";
@@ -88,6 +89,7 @@ before(async () => {
       { provide: CATALOG_REPOSITORY, useValue: catalogRepository },
       { provide: BLOB_STORAGE, useValue: blobStorage },
       { provide: APP_FILTER, useClass: ApiExceptionFilter },
+      { provide: APP_INTERCEPTOR, useClass: RequestLoggingInterceptor },
       { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor }
     ]
   })

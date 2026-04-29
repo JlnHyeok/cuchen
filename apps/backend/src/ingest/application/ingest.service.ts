@@ -46,9 +46,14 @@ export class IngestService implements OnModuleInit {
   }
 
   async scanAndIngest(rootDir: string): Promise<IngestOutcome> {
+    this.logger.log(`[ingest] startup scan start rootDir=${rootDir}`);
     await fs.mkdir(rootDir, { recursive: true });
     const absoluteFiles = await listFilesRecursive(rootDir);
-    return this.ingestFileList(rootDir, absoluteFiles);
+    const outcome = await this.ingestFileList(rootDir, absoluteFiles);
+    this.logger.log(
+      `[ingest] startup scan done rootDir=${rootDir} files=${absoluteFiles.length} processed=${outcome.processed} synced=${outcome.synced} partial=${outcome.partial} failed=${outcome.failed} skipped=${outcome.skipped}`
+    );
+    return outcome;
   }
 
   async ingestPairs(candidates: PairCandidate[]): Promise<IngestOutcome> {
@@ -79,6 +84,7 @@ export class IngestService implements OnModuleInit {
   }
 
   async syncPair(candidate: PairCandidate): Promise<CatalogRecord> {
+    this.logger.log(`[ingest] pair start fileName=${candidate.fileName} imagePath=${candidate.imagePath}`);
     const imageBuffer = await fs.readFile(candidate.imagePath);
     const jsonRaw = await fs.readFile(candidate.jsonPath, "utf8");
     const parsed = JSON.parse(jsonRaw) as Record<string, unknown>;
@@ -108,10 +114,12 @@ export class IngestService implements OnModuleInit {
       const thumbnailBuffer = await createThumbnailBuffer(imageBuffer);
       await this.blobStorage.putThumbnail(record, thumbnailBuffer, THUMBNAIL_CONTENT_TYPE);
       await this.catalogRepository.upsert(record);
+      this.logger.log(`[ingest] pair synced imageId=${record.imageId} fileName=${candidate.fileName}`);
       return record;
     } catch (error) {
       const failedRecord = { ...record, syncStatus: "partial" as const, errorMessage: String(error), updatedAt: new Date().toISOString() };
       await this.catalogRepository.upsert(failedRecord);
+      this.logger.warn(`[ingest] pair partial imageId=${record.imageId} fileName=${candidate.fileName} error=${String(error)}`);
       return failedRecord;
     }
   }
@@ -120,6 +128,9 @@ export class IngestService implements OnModuleInit {
     if (this.watcherStarted) return;
     this.watcherStarted = true;
     const { watch } = await import("chokidar");
+    this.logger.log(
+      `[ingest] watcher start rootDir=${rootDir} usePolling=${this.config.ingestWatchUsePolling} intervalMs=${this.config.ingestWatchIntervalMs}`
+    );
     const watcher = watch(rootDir, {
       ignored: /(^|[\\/])\../,
       ignoreInitial: true,
@@ -137,6 +148,7 @@ export class IngestService implements OnModuleInit {
       if (![".png", ".jpg", ".jpeg", ".json"].includes(ext)) {
         return;
       }
+      this.logger.log(`[ingest] watcher event event=${_event} filePath=${filePath}`);
       const key = pairKey(filePath);
       const previous = this.pending.get(key);
       if (previous) {
@@ -170,6 +182,7 @@ export class IngestService implements OnModuleInit {
       fileExt: path.extname(imagePath).toLowerCase()
     };
     await this.syncPair(candidate);
+    this.logger.log(`[ingest] watcher pair handled fileName=${candidate.fileName}`);
     this.pending.delete(pairKey(filePath));
   }
 }

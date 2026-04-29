@@ -10,6 +10,7 @@ import { StorageModule } from "./storage/storage.module.js";
 import { loadAppConfig } from "./common/config/app-config.js";
 import { ApiExceptionFilter } from "./common/http/api-exception.filter.js";
 import { ApiResponseInterceptor } from "./common/http/api-response.interceptor.js";
+import { RequestLoggingInterceptor } from "./common/http/request-logging.interceptor.js";
 
 const config = loadAppConfig();
 const mongooseImports =
@@ -39,6 +40,10 @@ const mongooseImports =
     {
       provide: APP_FILTER,
       useClass: ApiExceptionFilter
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggingInterceptor
     },
     {
       provide: APP_INTERCEPTOR,
