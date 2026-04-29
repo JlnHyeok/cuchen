@@ -8,5 +8,7 @@ export {
   getPreviewImageBlob,
   getProductFiles,
   isBackendConnectionError,
-  listFiles
+  listFiles,
+  subscribeCatalogEvents
 } from './backendFileApi';
+export type { CatalogEventSubscription, CatalogRealtimeEvent, CatalogRecordSyncedEvent } from './backendFileApi';

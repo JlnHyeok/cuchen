@@ -9,6 +9,7 @@ import { BLOB_STORAGE, CATALOG_REPOSITORY } from "../../storage/storage.tokens.j
 import type { CatalogRepository } from "../../catalog/domain/catalog.repository.js";
 import type { BlobStorage } from "../../images/domain/blob.storage.js";
 import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../../images/application/thumbnail.js";
+import { IngestEventsService } from "./ingest-events.service.js";
 
 interface PairCandidate {
   relativeKey: string;
@@ -27,7 +28,8 @@ export class IngestService implements OnModuleInit {
 
   constructor(
     @Inject(CATALOG_REPOSITORY) private readonly catalogRepository: CatalogRepository,
-    @Inject(BLOB_STORAGE) private readonly blobStorage: BlobStorage
+    @Inject(BLOB_STORAGE) private readonly blobStorage: BlobStorage,
+    private readonly ingestEvents: IngestEventsService = new IngestEventsService()
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -114,6 +116,7 @@ export class IngestService implements OnModuleInit {
       const thumbnailBuffer = await createThumbnailBuffer(imageBuffer);
       await this.blobStorage.putThumbnail(record, thumbnailBuffer, THUMBNAIL_CONTENT_TYPE);
       await this.catalogRepository.upsert(record);
+      this.ingestEvents.publishRecordSynced(record);
       this.logger.log(`[ingest] pair synced imageId=${record.imageId} fileName=${candidate.fileName}`);
       return record;
     } catch (error) {

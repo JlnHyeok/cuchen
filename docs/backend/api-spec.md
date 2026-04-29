@@ -68,6 +68,10 @@
 - `GET /images/:imageId/thumbnail`
 - `GET /images/:imageId/download`
 
+다음 API는 JSON envelope가 아니라 `text/event-stream`을 반환한다.
+
+- `GET /images/events`
+
 ## 3. API 목록
 
 | Method | Path | 설명 |
@@ -81,6 +85,7 @@
 | `GET` | `/images/:imageId/blob` | 원본 이미지 스트리밍 |
 | `GET` | `/images/:imageId/thumbnail` | 썸네일 스트리밍 |
 | `GET` | `/images/:imageId/download` | 파일 저장용 원본 이미지 반환 |
+| `GET` | `/images/events` | catalog 변경 이벤트 SSE 스트리밍 |
 
 MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.version` 값이 있으면 user metadata `X-Amz-Meta-Version`에 같은 값을 포함한다.
 
@@ -223,6 +228,35 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 
 - `Content-Type`
 - `Content-Disposition`
+
+### 4.10 `GET /images/events`
+
+catalog 변경 이벤트를 Server-Sent Events 형식으로 스트리밍한다.
+
+#### 이벤트
+
+| 이벤트명 | 설명 |
+| --- | --- |
+| `catalog.record.synced` | ingest가 이미지/JSON pair를 MongoDB와 MinIO에 동기화한 뒤 발행 |
+| `catalog.ping` | 연결 유지를 위한 heartbeat |
+
+#### `catalog.record.synced` 데이터
+
+```json
+{
+  "type": "catalog.record.synced",
+  "sequence": 1,
+  "occurredAt": "2026-04-29T08:00:00.000Z",
+  "record": {
+    "imageId": "cuchen-00001-top",
+    "productId": "CUCHEN-00001",
+    "div": "top",
+    "result": "OK",
+    "version": "v1",
+    "updatedAt": "2026-04-29T08:00:00.000Z"
+  }
+}
+```
 
 ## 5. 저장 모델 요약
 

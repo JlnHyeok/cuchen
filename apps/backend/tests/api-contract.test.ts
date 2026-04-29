@@ -12,6 +12,8 @@ import { CatalogController } from "../src/catalog/api/catalog.controller.js";
 import { CatalogService } from "../src/catalog/application/catalog.service.js";
 import { HealthController } from "../src/health/health.controller.js";
 import { ImagesController } from "../src/images/api/images.controller.js";
+import { IngestEventsController } from "../src/ingest/api/ingest-events.controller.js";
+import { CATALOG_RECORD_SYNCED_EVENT, IngestEventsService } from "../src/ingest/application/ingest-events.service.js";
 import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../src/images/application/thumbnail.js";
 import { ImagesService } from "../src/images/application/images.service.js";
 import { ApiExceptionFilter } from "../src/common/http/api-exception.filter.js";
@@ -82,10 +84,11 @@ before(async () => {
   await blobStorage.putThumbnail(record, thumbnailBuffer, THUMBNAIL_CONTENT_TYPE);
 
   @Module({
-    controllers: [HealthController, CatalogController, ImagesController],
+    controllers: [HealthController, CatalogController, IngestEventsController, ImagesController],
     providers: [
       CatalogService,
       ImagesService,
+      IngestEventsService,
       { provide: CATALOG_REPOSITORY, useValue: catalogRepository },
       { provide: BLOB_STORAGE, useValue: blobStorage },
       { provide: APP_FILTER, useClass: ApiExceptionFilter },
@@ -217,6 +220,29 @@ test("stream endpoints stay raw", async () => {
     const body = Buffer.from(await response.arrayBuffer());
     assert.deepEqual(body, expectedBody);
   }
+});
+
+test("catalog events endpoint streams raw server-sent events", async () => {
+  const abort = new AbortController();
+  const response = await fetch(`${baseUrl}/images/events`, { signal: abort.signal });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/event-stream/);
+
+  const events = app.get(IngestEventsService);
+  events.publishRecordSynced(seed.record);
+
+  const reader = response.body?.getReader();
+  assert.ok(reader);
+  let raw = "";
+  while (!raw.includes(CATALOG_RECORD_SYNCED_EVENT)) {
+    const chunk = await reader.read();
+    assert.equal(chunk.done, false);
+    raw += Buffer.from(chunk.value).toString("utf8");
+  }
+
+  abort.abort();
+  assert.match(raw, new RegExp(`event: ${CATALOG_RECORD_SYNCED_EVENT}`));
+  assert.match(raw, /"imageId":"sample-01"/);
 });
 
 test("not-found responses flow through the error envelope", async () => {
