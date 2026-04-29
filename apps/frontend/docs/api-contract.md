@@ -14,7 +14,7 @@
 ## Metadata
 | 항목명 | 타입 | 설명 | 비고 |
 |---|---:|---|---|
-| `product_id` | string | 제품번호 |  |
+| `productId` | string | 제품번호 |  |
 | `div` | string | 이미지 구분 | `top`, `bot`, `top-inf`, `bot-inf` |
 | `time` | string | 촬영 일시 | ISO 8601 |
 | `result` | string | 검사 결과 | `OK`, `NG` |
@@ -94,8 +94,8 @@ Query:
 - `productPage`: `1 | true`, 선택. 제품 기준 페이지네이션을 사용한다.
 - `capturedAtFrom`: ISO datetime, 선택
 - `capturedAtTo`: ISO datetime, 선택
-- `productNo`: string, 선택. 백엔드는 `productNo`, `product_id`, `productId`를 함께 검색한다.
-- `processCode`: `top | bot | top-inf | bot-inf`, 선택. 백엔드는 `processCode`, `process_code`, `div`를 함께 검색한다.
+- `productNo`: string, 선택. 백엔드는 `productId`와 파일명을 검색한다.
+- `div`: `top | bot | top-inf | bot-inf`, 선택. 이미지 구분을 검색한다.
 - `result`: `OK | NG`, 선택
 - `lotNo`: string, 선택
 - `processId`: string, 선택
@@ -111,7 +111,7 @@ Envelope `data`:
       "fileName": "CUCHEN-00001-top",
       "fileExt": "png",
       "metadata": {
-        "product_id": "CUCHEN-00001",
+        "productId": "CUCHEN-00001",
         "div": "top",
         "time": "2026-04-21T09:00:00.000Z",
         "result": "OK",

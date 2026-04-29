@@ -46,9 +46,9 @@
 
 현재 백엔드가 정규화하는 메타데이터 필드는 아래와 같다.
 
-- `productNo`
+- `productId`
 - `capturedAt`
-- `processCode`
+- `div`
 - `result`
 - `threshold`
 - `lotNo`
@@ -146,7 +146,7 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 | --- | --- | --- |
 | `bucket` | `string` | 버킷 필터 |
 | `productNo` | `string` | 제품번호 포함 검색 |
-| `processCode` | `string` | 공정코드 포함 검색 |
+| `div` | `string` | 이미지 구분 검색 |
 | `result` | `string` | 판정 결과 |
 | `aiResult` | `string` | 이전 호환 필드 |
 | `lotNo` | `string` | LOT 번호 포함 검색 |

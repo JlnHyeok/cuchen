@@ -30,7 +30,7 @@
 - 날짜 필터는 범위 검색이다.
 - 목록은 `productId` 기준으로 병합해 제품 1개당 대표 행 1개만 표시한다.
 - 대표 행의 구성 값은 같은 제품에 속한 이미지 개수를 기준으로 `4종`처럼 표시한다.
-- metadata는 `product_id`, `div`, `time`, `result`, `threshold`, `prob`를 화면에 표시한다.
+- metadata는 `productId`, `div`, `time`, `result`, `threshold`, `prob`를 화면에 표시한다.
 - 상세 모달은 같은 `productId`에 속한 `top`, `bot`, `top-inf`, `bot-inf` 이미지를 가능한 만큼 함께 표시하고 각 이미지의 metadata를 같이 보여준다.
 - 이미지 파일만 미리보기 대상으로 취급한다.
 - 행 다운로드는 해당 제품 묶음의 이미지들과 각 이미지의 metadata JSON을 ZIP으로 저장한다.

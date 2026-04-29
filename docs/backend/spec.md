@@ -46,7 +46,7 @@
 - 지원 쿼리
   - `bucket`
   - `productNo`
-  - `processCode`
+  - `div`
   - `result`
   - `aiResult`
   - `lotNo`
@@ -100,9 +100,9 @@ MongoDB는 조회 정본 문서만 저장한다.
 - `updatedAt`
 
 `metadata` 하위 필드:
-- `productNo`
+- `productId`
 - `capturedAt`
-- `processCode`
+- `div`
 - `result`
 - `threshold`
 - `lotNo`
