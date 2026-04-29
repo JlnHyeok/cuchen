@@ -40,8 +40,8 @@ export class IngestEventsService {
       occurredAt: new Date().toISOString(),
       record: {
         imageId: record.imageId,
-        productId: readText(record.metadata.product_id) ?? readText(record.metadata.productId) ?? readText(record.metadata.productNo) ?? null,
-        div: readText(record.metadata.div) ?? readText(record.metadata.processCode) ?? null,
+        productId: readText(record.metadata.productId) ?? null,
+        div: readText(record.metadata.div) ?? null,
         result: readText(record.metadata.result) ?? null,
         version: readText(record.metadata.version) ?? null,
         updatedAt: record.updatedAt
