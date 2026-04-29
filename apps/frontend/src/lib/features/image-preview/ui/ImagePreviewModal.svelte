@@ -121,7 +121,7 @@
                 <dd>{formatPercent(commonProbability)}</dd>
               </div>
               <div class="common-field threshold-field">
-                <dt>판정 기준</dt>
+                <dt>판정 임계치</dt>
                 <dd>{commonThreshold}</dd>
               </div>
             </dl>
@@ -155,10 +155,6 @@
                     {/if}
                   </div>
                   <dl class="metadata-list">
-                    <div>
-                      <dt>이미지 구분</dt>
-                      <dd>{formatDiv(item.file.div)}</dd>
-                    </div>
                     <div>
                       <dt>크기</dt>
                       <dd>{formatBytes(item.file.sizeBytes)}</dd>
