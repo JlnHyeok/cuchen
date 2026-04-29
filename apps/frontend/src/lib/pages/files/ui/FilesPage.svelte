@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { getFilterOptions, getImageBlob, getPreviewImageBlob, getProductFiles, listFiles } from '@entities/file/api';
+  import { checkBackendConnection, getFilterOptions, getImageBlob, getPreviewImageBlob, getProductFiles, isBackendConnectionError, listFiles } from '@entities/file/api';
   import type { FileListItem, FileListQuery, FilterOptions, PageResult } from '@entities/file/model';
   import { saveAllFilesToDisk, saveFileToDisk, saveSelectedFilesToDisk } from '@features/file-download/model/saveFileToDisk';
   import FileFilters from '@features/file-filter/ui/FileFilters.svelte';
@@ -16,6 +16,21 @@
     imageUrl?: string;
     imageLoading: boolean;
     imageError?: string;
+  };
+  type ToastTone = 'error' | 'success' | 'info';
+  type ToastMessage = {
+    id: string;
+    tone: ToastTone;
+    message: string;
+  };
+  type ToastPosition = {
+    left: number;
+    top: number;
+  };
+  type ToastDragState = {
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
   };
 
   const initialPage: PageResult<FileListItem> = {
@@ -49,12 +64,11 @@
   let query: FileListQuery = { ...filters, page: 1, pageSize: 20 };
   let pageResult = initialPage;
   let loading = true;
-  let errorMessage = '';
-  let statusMessage = '';
   let downloadingId: string | null = null;
   let downloadingSelected = false;
   let downloadingAll = false;
   let selectedIds: string[] = [];
+  let toasts: ToastMessage[] = [];
 
   let previewOpen = false;
   let previewProductId = '';
@@ -67,23 +81,237 @@
   let originalViewerBlobPromise: Promise<Blob> | null = null;
   const originalBlobCache = new Map<string, Blob>();
   const originalBlobRequests = new Map<string, Promise<Blob>>();
+  const activeDownloadStorageKey = 'cuchen-active-download';
+  const toastPositionStorageKey = 'cuchen-toast-position';
+  const reconnectDelayMs = 6000;
+  const toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let toastRegionElement: HTMLDivElement | null = null;
+  let toastPosition: ToastPosition | null = null;
+  let toastDragState: ToastDragState | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectingBackend = false;
+  let reconnectAttemptCount = 0;
+  let activeDownloadCount = 0;
 
   $: selectedIdSet = new Set(selectedIds);
   $: currentPageIds = pageResult.items.map((item) => item.id);
   $: selectedVisibleCount = currentPageIds.filter((id) => selectedIdSet.has(id)).length;
   $: allVisibleSelected = currentPageIds.length > 0 && selectedVisibleCount === currentPageIds.length;
+  $: toastRegionStyle = toastPosition
+    ? `left: ${toastPosition.left}px; top: ${toastPosition.top}px; right: auto; bottom: auto;`
+    : '';
+
+  function showToast(
+    message: string,
+    tone: ToastTone,
+    id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    durationMs: number | null = tone === 'error' ? 6000 : 3500
+  ): string {
+    const nextToast = { id, tone, message };
+    const existing = toasts.some((toast) => toast.id === id);
+    toasts = existing ? toasts.map((toast) => (toast.id === id ? nextToast : toast)) : [...toasts, nextToast];
+    if (durationMs === null) {
+      clearToastDismiss(id);
+    } else {
+      scheduleToastDismiss(id, durationMs);
+    }
+    return id;
+  }
+
+  function clearToastDismiss(id: string): void {
+    const existingTimer = toastTimers.get(id);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      toastTimers.delete(id);
+    }
+  }
+
+  function scheduleToastDismiss(id: string, durationMs: number): void {
+    clearToastDismiss(id);
+
+    const timer = setTimeout(() => dismissToast(id), durationMs);
+    toastTimers.set(id, timer);
+  }
+
+  function dismissToast(id: string): void {
+    clearToastDismiss(id);
+    toasts = toasts.filter((toast) => toast.id !== id);
+  }
+
+  function shouldScrollToast(message: string): boolean {
+    return message.length > 28;
+  }
+
+  function clampToastPosition(position: ToastPosition): ToastPosition {
+    if (typeof window === 'undefined') return position;
+    const margin = 8;
+    const rect = toastRegionElement?.getBoundingClientRect();
+    const width = rect?.width ?? 420;
+    const height = rect?.height ?? 56;
+    return {
+      left: Math.min(Math.max(position.left, margin), Math.max(margin, window.innerWidth - width - margin)),
+      top: Math.min(Math.max(position.top, margin), Math.max(margin, window.innerHeight - height - margin))
+    };
+  }
+
+  function saveToastPosition(position: ToastPosition): void {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(toastPositionStorageKey, JSON.stringify(position));
+  }
+
+  function restoreToastPosition(): void {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(toastPositionStorageKey);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<ToastPosition>;
+      if (typeof parsed.left !== 'number' || typeof parsed.top !== 'number') return;
+      toastPosition = clampToastPosition({ left: parsed.left, top: parsed.top });
+    } catch {
+      window.localStorage.removeItem(toastPositionStorageKey);
+    }
+  }
+
+  function startToastDrag(event: PointerEvent): void {
+    if (!(event.target instanceof Element) || event.target.closest('.toast-close')) return;
+    const rect = toastRegionElement?.getBoundingClientRect();
+    if (!rect) return;
+
+    toastDragState = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top
+    };
+    toastRegionElement?.setPointerCapture(event.pointerId);
+    toastPosition = clampToastPosition({ left: rect.left, top: rect.top });
+    event.preventDefault();
+  }
+
+  function moveToastDrag(event: PointerEvent): void {
+    if (!toastDragState || event.pointerId !== toastDragState.pointerId) return;
+    toastPosition = clampToastPosition({
+      left: event.clientX - toastDragState.offsetX,
+      top: event.clientY - toastDragState.offsetY
+    });
+  }
+
+  function endToastDrag(event: PointerEvent): void {
+    if (!toastDragState || event.pointerId !== toastDragState.pointerId) return;
+    if (toastRegionElement?.hasPointerCapture(event.pointerId)) {
+      toastRegionElement.releasePointerCapture(event.pointerId);
+    }
+    toastDragState = null;
+    if (toastPosition) {
+      const nextPosition = clampToastPosition(toastPosition);
+      toastPosition = nextPosition;
+      saveToastPosition(nextPosition);
+    }
+  }
+
+  function handleWindowResize(): void {
+    if (!toastPosition) return;
+    const nextPosition = clampToastPosition(toastPosition);
+    toastPosition = nextPosition;
+    saveToastPosition(nextPosition);
+  }
+
+  function beginDownloadTask(): void {
+    activeDownloadCount += 1;
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(activeDownloadStorageKey, '1');
+  }
+
+  function endDownloadTask(): void {
+    activeDownloadCount = Math.max(0, activeDownloadCount - 1);
+    if (activeDownloadCount === 0 && typeof window !== 'undefined') {
+      window.localStorage.removeItem(activeDownloadStorageKey);
+    }
+  }
+
+  function handleBeforeUnload(event: BeforeUnloadEvent): void {
+    if (activeDownloadCount === 0) return;
+    event.preventDefault();
+    event.returnValue = '';
+  }
+
+  function notifyInterruptedDownload(): void {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem(activeDownloadStorageKey) !== '1') return;
+    window.localStorage.removeItem(activeDownloadStorageKey);
+    showToast('새로고침으로 진행 중이던 다운로드가 취소되었습니다. 다시 다운로드를 시작해주세요.', 'error', 'download-interrupted');
+  }
+
+  function reportError(error: unknown, toastId: string): void {
+    if (isBackendConnectionError(error)) {
+      handleBackendDisconnected();
+      return;
+    }
+    showToast(getErrorMessage(error), 'error', toastId);
+  }
+
+  function handleBackendDisconnected(): void {
+    if (!reconnectingBackend) {
+      reconnectingBackend = true;
+      reconnectAttemptCount = 0;
+      showToast('백엔드 서버와 연결이 끊겼습니다. 자동으로 재연결을 시도합니다.', 'error', 'backend-connection', null);
+    }
+    scheduleReconnect();
+  }
+
+  function scheduleReconnect(): void {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      void checkBackendRecovery();
+    }, reconnectDelayMs);
+  }
+
+  function stopReconnect(): void {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
+
+  async function checkBackendRecovery(): Promise<void> {
+    reconnectAttemptCount += 1;
+    showToast(`백엔드 서버 재연결 시도 중입니다. (${reconnectAttemptCount}회)`, 'error', 'backend-connection', null);
+
+    try {
+      await checkBackendConnection();
+      reconnectingBackend = false;
+      reconnectAttemptCount = 0;
+      stopReconnect();
+      showToast('백엔드 서버와 다시 연결되었습니다.', 'success', 'backend-connection');
+      await Promise.all([loadFiles(query), loadFilterOptions()]);
+    } catch (error) {
+      if (isBackendConnectionError(error)) {
+        scheduleReconnect();
+        return;
+      }
+      reportError(error, 'backend-connection');
+    }
+  }
 
   async function loadFiles(nextQuery: FileListQuery = query): Promise<void> {
     loading = true;
-    errorMessage = '';
 
     try {
       pageResult = await listFiles(nextQuery);
       query = nextQuery;
     } catch (error) {
-      errorMessage = getErrorMessage(error);
+      reportError(error, 'file-list-error');
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadFilterOptions(): Promise<void> {
+    try {
+      filterOptions = await getFilterOptions();
+    } catch (error) {
+      reportError(error, 'filter-options-error');
     }
   }
 
@@ -274,16 +502,16 @@
 
   async function download(file: FileListItem): Promise<void> {
     downloadingId = file.id;
-    errorMessage = '';
-    statusMessage = '';
+    beginDownloadTask();
 
     try {
       const result = await saveFileToDisk(file);
-      statusMessage = result.canceled ? '다운로드가 취소되었습니다.' : `저장 완료: ${result.filePath ?? file.fileName}`;
+      showToast(result.canceled ? '다운로드가 취소되었습니다.' : `저장 완료: ${result.filePath ?? file.fileName}`, 'success', `download-${file.id}`);
     } catch (error) {
-      errorMessage = getErrorMessage(error);
+      showToast(getErrorMessage(error), 'error', `download-${file.id}`);
     } finally {
       downloadingId = null;
+      endDownloadTask();
     }
   }
 
@@ -291,18 +519,18 @@
     if (selectedIds.length === 0) return;
 
     downloadingSelected = true;
-    errorMessage = '';
-    statusMessage = '선택 파일 ZIP을 준비하는 중입니다.';
+    beginDownloadTask();
 
     try {
       const result = await saveSelectedFilesToDisk(selectedIds, (progress) => {
-        statusMessage = progress.message;
+        showToast(progress.message, 'info', 'selected-download', null);
       });
-      statusMessage = result.canceled ? '선택 다운로드가 취소되었습니다.' : `선택 파일 저장 완료: ${result.filePath ?? selectedIds.length}`;
+      showToast(result.canceled ? '선택 다운로드가 취소되었습니다.' : `선택 파일 저장 완료: ${result.filePath ?? selectedIds.length}`, 'success', 'selected-download');
     } catch (error) {
-      errorMessage = getErrorMessage(error);
+      showToast(getErrorMessage(error), 'error', 'selected-download');
     } finally {
       downloadingSelected = false;
+      endDownloadTask();
     }
   }
 
@@ -315,34 +543,42 @@
     if (!confirmed) return;
 
     downloadingAll = true;
-    errorMessage = '';
-    statusMessage = '전체 다운로드 ZIP을 준비하는 중입니다.';
+    beginDownloadTask();
+    showToast('전체 다운로드 ZIP을 준비하는 중입니다.', 'info', 'all-download', null);
 
     try {
       const result = await saveAllFilesToDisk({ ...query, page: 1 }, pageResult.total, (progress) => {
-        statusMessage = progress.message;
+        showToast(progress.message, 'info', 'all-download', null);
       });
-      statusMessage = result.canceled ? '전체 다운로드가 취소되었습니다.' : `전체 파일 저장 완료: ${result.filePath ?? pageResult.total}`;
+      showToast(result.canceled ? '전체 다운로드가 취소되었습니다.' : `전체 파일 저장 완료: ${result.filePath ?? pageResult.total}`, 'success', 'all-download');
     } catch (error) {
-      errorMessage = getErrorMessage(error);
+      showToast(getErrorMessage(error), 'error', 'all-download');
     } finally {
       downloadingAll = false;
+      endDownloadTask();
     }
   }
 
   onMount(() => {
+    restoreToastPosition();
+    notifyInterruptedDownload();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('resize', handleWindowResize);
     void loadFiles();
-    void getFilterOptions()
-      .then((options) => {
-        filterOptions = options;
-      })
-      .catch((error) => {
-        errorMessage = getErrorMessage(error);
-      });
+    void loadFilterOptions();
   });
 
   onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('resize', handleWindowResize);
+    }
     revokePreviewUrls();
+    stopReconnect();
+    for (const timer of toastTimers.values()) {
+      clearTimeout(timer);
+    }
+    toastTimers.clear();
   });
 </script>
 
@@ -355,12 +591,6 @@
     </div>
     <FileFilters {filters} options={filterOptions} disabled={loading} onApply={applyFilters} onReset={resetFilters} />
   </section>
-
-  {#if errorMessage}
-    <p class="message error">{errorMessage}</p>
-  {:else if statusMessage}
-    <p class="message success">{statusMessage}</p>
-  {/if}
 
   <section class="content" aria-label="파일 목록">
     <div class="list-heading">
@@ -428,4 +658,33 @@
     originalBlobPromise={originalViewerBlobPromise}
     onClose={closeOriginalViewer}
   />
+
+  {#if toasts.length > 0}
+    <div
+      bind:this={toastRegionElement}
+      class:toast-region-dragging={Boolean(toastDragState)}
+      class="toast-region"
+      style={toastRegionStyle}
+      role="status"
+      aria-live="polite"
+      aria-label="알림"
+      on:pointerdown={startToastDrag}
+      on:pointermove={moveToastDrag}
+      on:pointerup={endToastDrag}
+      on:pointercancel={endToastDrag}
+    >
+      {#each toasts as toast (toast.id)}
+        <div
+          class:toast-error={toast.tone === 'error'}
+          class:toast-success={toast.tone === 'success'}
+          class:toast-info={toast.tone === 'info'}
+          class:toast-scrolling={shouldScrollToast(toast.message)}
+          class="toast"
+        >
+          <p><span>{toast.message}</span></p>
+          <button type="button" class="toast-close" aria-label="알림 닫기" on:click={() => dismissToast(toast.id)}>닫기</button>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </main>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unzipSync } from 'fflate';
-import { downloadFile, listFiles } from './backendFileApi';
+import { BackendConnectionError, downloadFile, isBackendConnectionError, listFiles } from './backendFileApi';
 
 function catalogRecord(productIndex: number, div: string) {
   const productId = `PRD-${String(productIndex).padStart(4, '0')}`;
@@ -220,6 +220,24 @@ describe('backendFileApi', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.productId).toBe('bulk-0001');
     expect(result.items[0]?.fileCount).toBe(4);
+  });
+
+  it('normalizes network failures as backend connection errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      })
+    );
+
+    try {
+      await listFiles({ page: 1, pageSize: 20 });
+      throw new Error('Expected listFiles to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BackendConnectionError);
+      expect(isBackendConnectionError(error)).toBe(true);
+      expect((error as Error).message).toBe('백엔드 서버에 연결할 수 없습니다.');
+    }
   });
 
   it('downloads product images with matching metadata json sidecars', async () => {

@@ -40,6 +40,17 @@ interface SearchResponse {
 type QueryParams = Record<string, string | number | undefined>;
 type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
 
+export class BackendConnectionError extends Error {
+  constructor() {
+    super('백엔드 서버에 연결할 수 없습니다.');
+    this.name = 'BackendConnectionError';
+  }
+}
+
+export function isBackendConnectionError(error: unknown): error is BackendConnectionError {
+  return error instanceof BackendConnectionError;
+}
+
 function getBackendBaseUrl(): string {
   const configured = import.meta.env.VITE_BACKEND_URL as string | undefined;
   return (configured || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
@@ -85,8 +96,19 @@ async function readErrorMessage(response: Response, fallbackMessage: string): Pr
   return fallbackMessage;
 }
 
+async function request(pathname: string, query: QueryParams = {}): Promise<Response> {
+  try {
+    return await fetch(buildUrl(pathname, query));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new BackendConnectionError();
+    }
+    throw error;
+  }
+}
+
 async function requestJson<T>(pathname: string, query: QueryParams = {}): Promise<T> {
-  const response = await fetch(buildUrl(pathname, query));
+  const response = await request(pathname, query);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, `요청에 실패했습니다: ${pathname}`));
   }
@@ -103,7 +125,7 @@ async function requestJson<T>(pathname: string, query: QueryParams = {}): Promis
 }
 
 async function requestBlob(pathname: string): Promise<Blob> {
-  const response = await fetch(buildUrl(pathname));
+  const response = await request(pathname);
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, `파일을 불러오지 못했습니다: ${pathname}`));
   }
@@ -440,6 +462,10 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     divs: IMAGE_DIVS.filter((div) => items.some((file) => file.div === div)),
     results: INSPECTION_RESULTS.filter((result) => items.some((file) => file.result === result))
   };
+}
+
+export async function checkBackendConnection(): Promise<void> {
+  await requestJson<unknown>('/health');
 }
 
 export async function getImageBlob(fileId: string): Promise<Blob> {
