@@ -1,6 +1,16 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { checkBackendConnection, getFilterOptions, getImageBlob, getPreviewImageBlob, getProductFiles, isBackendConnectionError, listFiles } from '@entities/file/api';
+  import {
+    checkBackendConnection,
+    getFilterOptions,
+    getImageBlob,
+    getPreviewImageBlob,
+    getProductFiles,
+    isBackendConnectionError,
+    listFiles,
+    subscribeCatalogEvents
+  } from '@entities/file/api';
+  import type { CatalogEventSubscription, CatalogRealtimeEvent } from '@entities/file/api';
   import type { FileListItem, FileListQuery, FilterOptions, PageResult } from '@entities/file/model';
   import { saveAllFilesToDisk, saveFileToDisk, saveSelectedFilesToDisk } from '@features/file-download/model/saveFileToDisk';
   import FileFilters from '@features/file-filter/ui/FileFilters.svelte';
@@ -84,14 +94,21 @@
   const activeDownloadStorageKey = 'cuchen-active-download';
   const toastPositionStorageKey = 'cuchen-toast-position';
   const reconnectDelayMs = 6000;
+  const fallbackRefreshIntervalMs = 30000;
   const toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let toastRegionElement: HTMLDivElement | null = null;
   let toastPosition: ToastPosition | null = null;
   let toastDragState: ToastDragState | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let fallbackRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let catalogEvents: CatalogEventSubscription | null = null;
   let reconnectingBackend = false;
   let reconnectAttemptCount = 0;
   let activeDownloadCount = 0;
+  let realtimeConnected = false;
+  let lastRealtimeRefreshAt = '';
+  let fileListRequestSequence = 0;
 
   $: selectedIdSet = new Set(selectedIds);
   $: currentPageIds = pageResult.items.map((item) => item.id);
@@ -294,16 +311,25 @@
     }
   }
 
-  async function loadFiles(nextQuery: FileListQuery = query): Promise<void> {
-    loading = true;
+  async function loadFiles(nextQuery: FileListQuery = query, options: { silent?: boolean } = {}): Promise<void> {
+    const requestId = fileListRequestSequence + 1;
+    fileListRequestSequence = requestId;
+    if (!options.silent) {
+      loading = true;
+    }
 
     try {
-      pageResult = await listFiles(nextQuery);
+      const nextPageResult = await listFiles(nextQuery);
+      if (requestId !== fileListRequestSequence) return;
+      pageResult = nextPageResult;
       query = nextQuery;
     } catch (error) {
+      if (requestId !== fileListRequestSequence) return;
       reportError(error, 'file-list-error');
     } finally {
-      loading = false;
+      if (requestId === fileListRequestSequence && !options.silent) {
+        loading = false;
+      }
     }
   }
 
@@ -339,6 +365,80 @@
 
   function changePageSize(nextPageSize: number): void {
     void loadFiles({ ...query, page: 1, pageSize: nextPageSize });
+  }
+
+  function canRefreshFilesSilently(): boolean {
+    return !loading && !reconnectingBackend && activeDownloadCount === 0 && !downloadingSelected && !downloadingAll;
+  }
+
+  function stopFallbackRefresh(): void {
+    if (fallbackRefreshTimer) {
+      clearInterval(fallbackRefreshTimer);
+      fallbackRefreshTimer = null;
+    }
+  }
+
+  function startFallbackRefresh(): void {
+    stopFallbackRefresh();
+    fallbackRefreshTimer = setInterval(() => {
+      void refreshFilesFromFallback();
+    }, fallbackRefreshIntervalMs);
+  }
+
+  function stopCatalogEvents(): void {
+    catalogEvents?.close();
+    catalogEvents = null;
+    realtimeConnected = false;
+    if (realtimeRefreshTimer) {
+      clearTimeout(realtimeRefreshTimer);
+      realtimeRefreshTimer = null;
+    }
+  }
+
+  function startCatalogEvents(): void {
+    stopCatalogEvents();
+    catalogEvents = subscribeCatalogEvents({
+      onOpen: () => {
+        realtimeConnected = true;
+      },
+      onError: () => {
+        realtimeConnected = false;
+      },
+      onEvent: () => {
+        scheduleRealtimeRefresh();
+      }
+    });
+  }
+
+  function scheduleRealtimeRefresh(): void {
+    if (realtimeRefreshTimer) {
+      clearTimeout(realtimeRefreshTimer);
+    }
+    realtimeRefreshTimer = setTimeout(() => {
+      realtimeRefreshTimer = null;
+      void refreshFilesFromRealtime();
+    }, 600);
+  }
+
+  async function refreshFilesFromRealtime(): Promise<void> {
+    if (!canRefreshFilesSilently()) {
+      scheduleRealtimeRefresh();
+      return;
+    }
+
+    await Promise.all([loadFiles(query, { silent: true }), loadFilterOptions()]);
+    lastRealtimeRefreshAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  async function refreshFilesFromFallback(): Promise<void> {
+    if (realtimeConnected || !canRefreshFilesSilently()) return;
+
+    try {
+      await Promise.all([loadFiles(query, { silent: true }), loadFilterOptions()]);
+      lastRealtimeRefreshAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch {
+      // loadFiles/loadFilterOptions handle user-facing errors.
+    }
   }
 
   function selectFile(file: FileListItem, selected: boolean): void {
@@ -566,6 +666,8 @@
     window.addEventListener('resize', handleWindowResize);
     void loadFiles();
     void loadFilterOptions();
+    startCatalogEvents();
+    startFallbackRefresh();
   });
 
   onDestroy(() => {
@@ -575,6 +677,8 @@
     }
     revokePreviewUrls();
     stopReconnect();
+    stopCatalogEvents();
+    stopFallbackRefresh();
     for (const timer of toastTimers.values()) {
       clearTimeout(timer);
     }
@@ -600,6 +704,10 @@
           현재 페이지 {pageResult.items.length.toLocaleString()}개 제품 · 전체 {pageResult.total.toLocaleString()}개 제품
           {#if pageResult.totalData !== undefined}
             ({pageResult.totalData.toLocaleString()}개 데이터)
+          {/if}
+          · 실시간 {realtimeConnected ? '연결됨' : '대기 중'}
+          {#if lastRealtimeRefreshAt}
+            · 마지막 {lastRealtimeRefreshAt}
           {/if}
         </p>
       </div>

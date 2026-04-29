@@ -35,6 +35,7 @@ raw-json/{imageId}.json
 - `GET /images/:id/blob`
 - `GET /images/:id/thumbnail`
 - `GET /images/:id/download`
+- `GET /images/events`
 
 ## 전환 경계
 목표 구조는 backend / frontend 분리 배포이지만, 책임 분리는 명확해야 한다.

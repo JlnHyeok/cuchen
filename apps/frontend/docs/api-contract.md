@@ -5,6 +5,7 @@
 - 실제 Backend HTTP 경로는 `/images` 계열을 기준으로 한다.
 - JSON 응답은 백엔드 공통 envelope `{ success, message, data, errorCode, errorMessage }`로 감싸진다.
 - 스트리밍 응답(`/images/:imageId/blob`, `/images/:imageId/download`)은 envelope 없이 binary를 반환한다.
+- 이벤트 응답(`/images/events`)은 envelope 없이 `text/event-stream`을 반환한다.
 - 날짜 필터는 metadata의 `time`을 기준으로 하며 `YYYY-MM-DD` 형식이다.
 - `dateFrom` / `dateTo`는 포함 범위다.
 - `productId` / `div` / `result`는 정확히 일치하는 값으로 필터링한다.
@@ -78,12 +79,14 @@ interface FilterOptions {
 - `getProductFiles(fileId): Promise<FileListItem[]>`
 - `downloadFile(fileId): Promise<{ blob: Blob; fileName: string }>`
 - `downloadFiles(fileIds): Promise<{ blob: Blob; fileName: string }>`
+- `subscribeCatalogEvents(options): CatalogEventSubscription`
 
 ## Backend HTTP 계약
 - `GET /images/search`
 - `GET /images/:imageId/metadata`
 - `GET /images/:imageId/blob`
 - `GET /images/:imageId/download`
+- `GET /images/events`
 
 ### GET `/images/search`
 백엔드는 기본적으로 이미지 단위 `CatalogRecord`를 반환한다. 목록 화면은 제품 단위 row가 필요하므로 `productPage=1`을 함께 보내고, 백엔드가 제품 기준으로 페이지네이션한 이미지 묶음을 한 번에 반환한다.
@@ -136,6 +139,30 @@ Envelope `data`:
 
 ### GET `/images/:imageId/download`
 선택한 이미지 원본을 다운로드용 binary로 반환한다. 프론트 다운로드는 이미지와 같은 basename의 metadata JSON을 함께 전달해야 하므로, 제품 묶음 ZIP과 선택 ZIP은 프론트에서 여러 이미지 blob과 `/images/:imageId/metadata` 응답의 `metadata`를 받아 `fflate`로 생성한다.
+
+### GET `/images/events`
+백엔드는 catalog 변경을 Server-Sent Events로 전달한다. 프론트는 이 이벤트를 데이터 변경 신호로 사용하고, 현재 검색 조건으로 `/images/search`를 다시 호출해 목록을 갱신한다.
+
+Event:
+- `catalog.record.synced`: ingest가 이미지/JSON pair를 MongoDB와 MinIO에 동기화한 뒤 발행
+- `catalog.ping`: 연결 유지를 위한 heartbeat
+
+`catalog.record.synced` data:
+```json
+{
+  "type": "catalog.record.synced",
+  "sequence": 1,
+  "occurredAt": "2026-04-29T08:00:00.000Z",
+  "record": {
+    "imageId": "cuchen-00001-top",
+    "productId": "CUCHEN-00001",
+    "div": "top",
+    "result": "OK",
+    "version": "v1",
+    "updatedAt": "2026-04-29T08:00:00.000Z"
+  }
+}
+```
 
 ## MongoDB paging 기준
 - 정렬은 `updatedAt desc, imageId asc`를 사용한다.

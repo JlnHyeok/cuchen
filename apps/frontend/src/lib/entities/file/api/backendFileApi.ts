@@ -40,6 +40,27 @@ interface SearchResponse {
 type QueryParams = Record<string, string | number | undefined>;
 type DownloadProgressHandler = (progress: { completed: number; total: number; message: string }) => void;
 type DownloadStartHandler = (productName: string) => void;
+export const CATALOG_RECORD_SYNCED_EVENT = 'catalog.record.synced';
+
+export interface CatalogRecordSyncedEvent {
+  type: typeof CATALOG_RECORD_SYNCED_EVENT;
+  sequence: number;
+  occurredAt: string;
+  record: {
+    imageId: string;
+    productId: string | null;
+    div: string | null;
+    result: string | null;
+    version: string | null;
+    updatedAt: string;
+  };
+}
+
+export type CatalogRealtimeEvent = CatalogRecordSyncedEvent;
+
+export interface CatalogEventSubscription {
+  close(): void;
+}
 
 export class BackendConnectionError extends Error {
   constructor() {
@@ -467,6 +488,31 @@ export async function getFilterOptions(): Promise<FilterOptions> {
 
 export async function checkBackendConnection(): Promise<void> {
   await requestJson<unknown>('/health');
+}
+
+export function subscribeCatalogEvents(options: {
+  onEvent: (event: CatalogRealtimeEvent) => void;
+  onOpen?: () => void;
+  onError?: () => void;
+}): CatalogEventSubscription {
+  if (typeof EventSource === 'undefined') {
+    return { close: () => {} };
+  }
+
+  const source = new EventSource(buildUrl('/images/events'));
+  source.addEventListener('open', () => options.onOpen?.());
+  source.addEventListener('error', () => options.onError?.());
+  source.addEventListener(CATALOG_RECORD_SYNCED_EVENT, (event) => {
+    try {
+      options.onEvent(JSON.parse((event as MessageEvent).data) as CatalogRealtimeEvent);
+    } catch {
+      options.onError?.();
+    }
+  });
+
+  return {
+    close: () => source.close()
+  };
 }
 
 export async function getImageBlob(fileId: string): Promise<Blob> {
