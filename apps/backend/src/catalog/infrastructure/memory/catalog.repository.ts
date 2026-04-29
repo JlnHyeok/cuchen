@@ -8,6 +8,11 @@ export class MemoryCatalogRepository implements CatalogRepository {
   async init(): Promise<void> {}
 
   async upsert(record: CatalogRecord): Promise<void> {
+    for (const existingId of findDuplicateRecordIds([...this.records.values()], record)) {
+      if (existingId !== record.imageId) {
+        this.records.delete(existingId);
+      }
+    }
     this.records.set(record.imageId, structuredClone(record));
   }
 
@@ -40,8 +45,8 @@ export class MemoryCatalogRepository implements CatalogRepository {
 function productPage(records: CatalogRecord[], page: number, pageSize: number): SearchResponse {
   const groups = new Map<string, CatalogRecord[]>();
   for (const record of records) {
-    const productId = productIdForRecord(record);
-    groups.set(productId, [...(groups.get(productId) ?? []), record]);
+    const productKey = productIdForRecord(record).toLowerCase();
+    groups.set(productKey, [...(groups.get(productKey) ?? []), record]);
   }
 
   const sortedGroups = [...groups.entries()].sort(([leftId, leftRecords], [rightId, rightRecords]) => {
@@ -53,7 +58,7 @@ function productPage(records: CatalogRecord[], page: number, pageSize: number): 
   const start = (page - 1) * pageSize;
   const pageProductIds = new Set(sortedGroups.slice(start, start + pageSize).map(([productId]) => productId));
   const items = records
-    .filter((record) => pageProductIds.has(productIdForRecord(record)))
+    .filter((record) => pageProductIds.has(productIdForRecord(record).toLowerCase()))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.imageId.localeCompare(right.imageId))
     .map((record) => structuredClone(record));
 
@@ -110,6 +115,22 @@ function matchesFilters(record: CatalogRecord, filters: SearchFilters): boolean 
   if (typeof filters.thresholdMin === "number" && Number(metadata.threshold ?? Number.NaN) < filters.thresholdMin) return false;
   if (typeof filters.thresholdMax === "number" && Number(metadata.threshold ?? Number.NaN) > filters.thresholdMax) return false;
   return true;
+}
+
+function findDuplicateRecordIds(records: CatalogRecord[], record: CatalogRecord): string[] {
+  const productId = readFirstString(record.metadata ?? {}, ["product_id", "productId", "productNo"]).toLowerCase();
+  const div = readFirstString(record.metadata ?? {}, ["div"]).toLowerCase();
+  if (!productId || !div) {
+    return [];
+  }
+
+  return records
+    .filter((candidate) => {
+      const candidateProductId = readFirstString(candidate.metadata ?? {}, ["product_id", "productId", "productNo"]).toLowerCase();
+      const candidateDiv = readFirstString(candidate.metadata ?? {}, ["div"]).toLowerCase();
+      return candidateProductId === productId && candidateDiv === div;
+    })
+    .map((candidate) => candidate.imageId);
 }
 
 function readFirstString(metadata: Record<string, unknown>, keys: string[]): string {

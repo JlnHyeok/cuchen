@@ -108,6 +108,18 @@ export const CatalogSchema = SchemaFactory.createForClass(CatalogMongoDocument);
 CatalogSchema.index({ "metadata.productNo": 1 });
 CatalogSchema.index({ "metadata.product_id": 1 });
 CatalogSchema.index({ "metadata.productId": 1 });
+CatalogSchema.index(
+  { "metadata.product_id": 1, "metadata.div": 1 },
+  {
+    unique: true,
+    name: "unique_product_id_div_ci",
+    collation: { locale: "en", strength: 2 },
+    partialFilterExpression: {
+      "metadata.product_id": { $type: "string" },
+      "metadata.div": { $type: "string" }
+    }
+  }
+);
 CatalogSchema.index({ "metadata.capturedAt": 1 });
 CatalogSchema.index({ "metadata.captured_at": 1 });
 CatalogSchema.index({ "metadata.time": 1 });

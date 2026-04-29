@@ -18,7 +18,22 @@ export class MongoCatalogRepository implements CatalogRepository {
   }
 
   async upsert(record: CatalogRecord): Promise<void> {
-    await this.catalogModel.updateOne({ imageId: record.imageId }, { $set: record }, { upsert: true });
+    const existing = await this.catalogModel.findOne({ imageId: record.imageId }).select("_id").lean<{ _id: unknown }>().exec();
+    if (existing) {
+      await this.catalogModel.updateOne({ _id: existing._id }, { $set: record }).exec();
+      return;
+    }
+
+    const duplicateFilter = buildDuplicateFilter(record);
+    if (duplicateFilter) {
+      const duplicate = await this.catalogModel.findOne(duplicateFilter).select("_id").lean<{ _id: unknown }>().exec();
+      if (duplicate) {
+        await this.catalogModel.updateOne({ _id: duplicate._id }, { $set: record }).exec();
+        return;
+      }
+    }
+
+    await this.catalogModel.updateOne({ imageId: record.imageId }, { $set: record }, { upsert: true }).exec();
   }
 
   async findById(imageId: string): Promise<CatalogRecord | null> {
@@ -76,26 +91,27 @@ export class MongoCatalogRepository implements CatalogRepository {
         }
       ]
     };
+    const productKeyExpression = { $toLower: productIdExpression };
 
     const [groupResult] = await this.catalogModel
       .aggregate<{
-        pageProducts: Array<{ productId: string }>;
+        pageProducts: Array<{ productKey: string }>;
         totalProducts: Array<{ count: number }>;
         totalData: Array<{ count: number }>;
       }>([
         { $match: query },
-        { $addFields: { __productId: productIdExpression } },
+        { $addFields: { __productKey: productKeyExpression } },
         {
           $facet: {
             pageProducts: [
-              { $group: { _id: "$__productId", latestUpdatedAt: { $max: "$updatedAt" } } },
+              { $group: { _id: "$__productKey", latestUpdatedAt: { $max: "$updatedAt" } } },
               { $sort: { latestUpdatedAt: -1, _id: 1 } },
               { $skip: start },
               { $limit: pageSize },
-              { $project: { _id: 0, productId: "$_id" } }
+              { $project: { _id: 0, productKey: "$_id" } }
             ],
             totalProducts: [
-              { $group: { _id: "$__productId" } },
+              { $group: { _id: "$__productKey" } },
               { $count: "count" }
             ],
             totalData: [{ $count: "count" }]
@@ -104,8 +120,8 @@ export class MongoCatalogRepository implements CatalogRepository {
       ])
       .exec();
 
-    const productIds = groupResult?.pageProducts.map((entry) => entry.productId) ?? [];
-    if (productIds.length === 0) {
+    const productKeys = groupResult?.pageProducts.map((entry) => entry.productKey) ?? [];
+    if (productKeys.length === 0) {
       return {
         items: [],
         total: groupResult?.totalProducts[0]?.count ?? 0,
@@ -118,10 +134,10 @@ export class MongoCatalogRepository implements CatalogRepository {
     const items = await this.catalogModel
       .aggregate<(CatalogRecord & Record<string, unknown>)>([
         { $match: query },
-        { $addFields: { __productId: productIdExpression } },
-        { $match: { __productId: { $in: productIds } } },
+        { $addFields: { __productKey: productKeyExpression } },
+        { $match: { __productKey: { $in: productKeys } } },
         { $sort: { updatedAt: -1, imageId: 1 } },
-        { $project: { __productId: 0 } }
+        { $project: { __productKey: 0 } }
       ])
       .exec();
 
@@ -258,6 +274,40 @@ function buildMongoQuery(filters: SearchFilters): Record<string, unknown> {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildDuplicateFilter(record: CatalogRecord): Record<string, unknown> | null {
+  const productId = readFirstMetadataString(record.metadata, ["product_id", "productId", "productNo"]);
+  const div = readFirstMetadataString(record.metadata, ["div"]);
+  if (!productId || !div) {
+    return null;
+  }
+
+  return {
+    $and: [
+      {
+        $or: [
+          { "metadata.product_id": exactCaseInsensitive(productId) },
+          { "metadata.productId": exactCaseInsensitive(productId) },
+          { "metadata.productNo": exactCaseInsensitive(productId) }
+        ]
+      },
+      { "metadata.div": exactCaseInsensitive(div) }
+    ]
+  };
+}
+
+function readFirstMetadataString(metadata: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function exactCaseInsensitive(value: string): RegExp {
+  return new RegExp(`^${escapeRegExp(value)}$`, "i");
 }
 
 function resultAliases(value: string): string[] {

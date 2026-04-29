@@ -129,6 +129,63 @@ test("ingest service upserts duplicate product and div from different paths", as
   assert.equal(searchResult.items[0]?.metadata.capturedAt, "2026-04-21T11:05:00.000Z");
 });
 
+test("ingest service dedupes product and div case-insensitively", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-case-dedupe-"));
+  const firstImagePath = path.join(rootDir, "first.png");
+  const firstJsonPath = path.join(rootDir, "first.json");
+  const secondImagePath = path.join(rootDir, "second.png");
+  const secondJsonPath = path.join(rootDir, "second.json");
+  const imageBuffer = Buffer.from(SAMPLE_PNG_BASE64, "base64");
+  await fs.writeFile(firstImagePath, imageBuffer);
+  await fs.writeFile(
+    firstJsonPath,
+    JSON.stringify({
+      product_id: "PRD-Case-001",
+      div: "TOP",
+      capturedAt: "2026-04-21T12:00:00.000Z",
+      result: "OK",
+      threshold: 0.9
+    })
+  );
+  await fs.writeFile(secondImagePath, imageBuffer);
+  await fs.writeFile(
+    secondJsonPath,
+    JSON.stringify({
+      product_id: "prd-case-001",
+      div: "top",
+      capturedAt: "2026-04-21T12:05:00.000Z",
+      result: "OK",
+      threshold: 0.9
+    })
+  );
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const firstRecord = await service.syncPair({
+    relativeKey: "first",
+    imagePath: firstImagePath,
+    jsonPath: firstJsonPath,
+    fileName: "first",
+    fileExt: ".png"
+  });
+  const secondRecord = await service.syncPair({
+    relativeKey: "second",
+    imagePath: secondImagePath,
+    jsonPath: secondJsonPath,
+    fileName: "second",
+    fileExt: ".png"
+  });
+
+  assert.equal(firstRecord.imageId, "prd-case-001-top");
+  assert.equal(secondRecord.imageId, "prd-case-001-top");
+  const searchResult = await catalog.search({ productNo: "PRD-Case-001" }, 1, 20);
+  assert.equal(searchResult.total, 1);
+  assert.equal(searchResult.items[0]?.metadata.capturedAt, "2026-04-21T12:05:00.000Z");
+});
+
 test("memory catalog search supports canonical metadata fields", async () => {
   const catalog = new MemoryCatalogRepository();
   await catalog.init();
@@ -221,6 +278,20 @@ test("memory catalog product search falls back to file name", async () => {
 
   assert.equal(result.total, 1);
   assert.equal(result.items[0]?.imageId, "search-check");
+});
+
+test("memory catalog removes existing case-variant product and div duplicates", async () => {
+  const catalog = new MemoryCatalogRepository();
+  await catalog.init();
+  await catalog.upsert(createCatalogRecord("legacy-upper", "PRD-CASE-002", "TOP", "2026-04-21T10:00:00.000Z"));
+  await catalog.upsert(createCatalogRecord("legacy-lower", "prd-case-002", "top", "2026-04-21T10:01:00.000Z"));
+  await catalog.upsert(createCatalogRecord("prd-case-002-top", "Prd-Case-002", "Top", "2026-04-21T10:02:00.000Z"));
+
+  const result = await catalog.search({ productNo: "PRD-CASE-002", productPage: true }, 1, 20);
+
+  assert.equal(result.total, 1);
+  assert.equal(result.totalData, 1);
+  assert.deepEqual(result.items.map((item) => item.imageId), ["prd-case-002-top"]);
 });
 
 test("memory catalog product pagination groups file-name fallback divisions", async () => {
