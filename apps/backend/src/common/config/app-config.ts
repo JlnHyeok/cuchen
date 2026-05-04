@@ -8,9 +8,6 @@ export interface AppConfig {
   corsOrigins: string[];
   storageMode: "memory" | "mongo-minio";
   ingestRootDir: string;
-  ingestWatchUsePolling: boolean;
-  ingestWatchIntervalMs: number;
-  stabilityDelayMs: number;
   testIoDelayMs: number;
   minioEndpoint: string;
   minioAccessKey: string;
@@ -24,13 +21,6 @@ export interface AppConfig {
 function toNumber(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function toBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) {
-    return fallback;
-  }
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 function splitList(value: string | undefined): string[] {
@@ -63,9 +53,6 @@ export function loadAppConfig(): AppConfig {
     corsOrigins: splitList(process.env.CORS_ORIGIN),
     storageMode: process.env.STORAGE_MODE === "mongo-minio" ? "mongo-minio" : "memory",
     ingestRootDir: resolveBackendPath(process.env.INGEST_ROOT_DIR, "generated/inbox"),
-    ingestWatchUsePolling: toBoolean(process.env.INGEST_WATCH_USE_POLLING, false),
-    ingestWatchIntervalMs: toNumber(process.env.INGEST_WATCH_INTERVAL_MS, 500),
-    stabilityDelayMs: toNumber(process.env.STABILITY_DELAY_MS, 500),
     testIoDelayMs: toNumber(process.env.TEST_IO_DELAY_MS, 0),
     minioEndpoint: process.env.MINIO_ENDPOINT ?? "http://127.0.0.1:9000",
     minioAccessKey: process.env.MINIO_ACCESS_KEY ?? "minioadmin",

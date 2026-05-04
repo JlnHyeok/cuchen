@@ -116,11 +116,103 @@ test("scanAndIngest walks nested directories", async () => {
 
   assert.equal(outcome.processed, 1);
   assert.equal(outcome.synced, 1);
+  assert.equal(await pathExists(path.join(nestedDir, "sample.png")), false);
+  assert.equal(await pathExists(path.join(nestedDir, "sample.json")), false);
+  assert.equal(await pathExists(path.join(rootDir, "processed", "nested", "deeper", "sample.png")), false);
+  assert.equal(await pathExists(path.join(rootDir, "processed", "nested", "deeper", "sample.json")), false);
   const records = await catalog.listPendingPairs();
   assert.equal(records.length, 0);
   const searchResult = await catalog.search({ productNo: "PRD-20002" }, 1, 20);
   assert.equal(searchResult.items[0]?.metadata.version, "v1");
   assert.equal(searchResult.items[0]?.metadata.size, Buffer.from(SAMPLE_PNG_BASE64, "base64").length);
+
+  const secondOutcome = await service.scanAndIngest(rootDir);
+  assert.equal(secondOutcome.processed, 0);
+  assert.equal(secondOutcome.synced, 0);
+});
+
+test("scanAndIngest moves failed pairs into failed directory", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-failed-"));
+  const imagePath = path.join(rootDir, "bad.png");
+  const jsonPath = path.join(rootDir, "bad.json");
+  await fs.writeFile(imagePath, Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+  await fs.writeFile(jsonPath, "{");
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const outcome = await service.scanAndIngest(rootDir);
+
+  assert.equal(outcome.processed, 1);
+  assert.equal(outcome.failed, 1);
+  assert.equal(await pathExists(imagePath), false);
+  assert.equal(await pathExists(jsonPath), false);
+  assert.equal(await pathExists(path.join(rootDir, "failed", "bad.png")), true);
+  assert.equal(await pathExists(path.join(rootDir, "failed", "bad.json")), true);
+
+  const secondOutcome = await service.scanAndIngest(rootDir);
+  assert.equal(secondOutcome.processed, 0);
+});
+
+test("ingestFilebase stores four division pairs and deletes successful files", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-"));
+  await writeDivisionPairs(rootDir, "cuchen-test");
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const outcome = await service.ingestFilebase(rootDir, "cuchen-test");
+
+  assert.deepEqual(outcome, { processed: 4, synced: 4, partial: 0, failed: 0, skipped: 0 });
+  for (const div of IMAGE_DIVS) {
+    assert.equal(await pathExists(path.join(rootDir, `cuchen-test-${div}.png`)), false);
+    assert.equal(await pathExists(path.join(rootDir, `cuchen-test-${div}.json`)), false);
+  }
+  assert.equal(await pathExists(path.join(rootDir, "processed")), false);
+  assert.equal(await pathExists(path.join(rootDir, "failed")), false);
+
+  const searchResult = await catalog.search({ productNo: "CUCHEN-TEST" }, 1, 20);
+  assert.equal(searchResult.total, 4);
+});
+
+test("ingestFilebase rejects missing division files before ingesting", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-missing-"));
+  await writeDivisionPairs(rootDir, "cuchen-test");
+  await fs.rm(path.join(rootDir, "cuchen-test-bot-inf.json"));
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+
+  await assert.rejects(() => service.ingestFilebase(rootDir, "cuchen-test"), /missing ingest files/);
+  assert.equal((await catalog.search({ productNo: "CUCHEN-TEST" }, 1, 20)).total, 0);
+  assert.equal(await pathExists(path.join(rootDir, "cuchen-test-top.png")), true);
+  assert.equal(await pathExists(path.join(rootDir, "failed")), false);
+});
+
+test("ingestFilebase moves failed pairs into failed directory", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-failed-"));
+  await writeDivisionPairs(rootDir, "cuchen-test");
+  await fs.writeFile(path.join(rootDir, "cuchen-test-bot-inf.json"), "{");
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const outcome = await service.ingestFilebase(rootDir, "cuchen-test");
+
+  assert.deepEqual(outcome, { processed: 4, synced: 3, partial: 0, failed: 1, skipped: 0 });
+  assert.equal(await pathExists(path.join(rootDir, "cuchen-test-bot-inf.png")), false);
+  assert.equal(await pathExists(path.join(rootDir, "cuchen-test-bot-inf.json")), false);
+  assert.equal(await pathExists(path.join(rootDir, "failed", "cuchen-test-bot-inf.png")), true);
+  assert.equal(await pathExists(path.join(rootDir, "failed", "cuchen-test-bot-inf.json")), true);
 });
 
 test("ingest service upserts duplicate product and div from different paths", async () => {
@@ -360,6 +452,7 @@ test("memory catalog product pagination groups file-name fallback divisions", as
 
 const SAMPLE_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8D8WkAAAAASUVORK5CYII=";
+const IMAGE_DIVS = ["top", "bot", "top-inf", "bot-inf"] as const;
 
 function createCatalogRecord(imageId: string, productId: string, div: string, updatedAt: string) {
   return {
@@ -399,4 +492,32 @@ function createFileNameFallbackRecord(imageId: string, updatedAt: string) {
     createdAt: updatedAt,
     updatedAt
   };
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeDivisionPairs(rootDir: string, filebase: string): Promise<void> {
+  for (const div of IMAGE_DIVS) {
+    await fs.writeFile(path.join(rootDir, `${filebase}-${div}.png`), Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+    await fs.writeFile(
+      path.join(rootDir, `${filebase}-${div}.json`),
+      JSON.stringify({
+        productId: "CUCHEN-TEST",
+        capturedAt: "2026-04-30T04:00:00.000Z",
+        div,
+        result: "OK",
+        threshold: 0.82,
+        lotNo: "LOT-001",
+        processId: `PROC-${div.toUpperCase()}`,
+        version: "test-v1"
+      })
+    );
+  }
 }

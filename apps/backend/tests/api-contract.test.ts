@@ -12,8 +12,11 @@ import { CatalogController } from "../src/catalog/api/catalog.controller.js";
 import { CatalogService } from "../src/catalog/application/catalog.service.js";
 import { HealthController } from "../src/health/health.controller.js";
 import { ImagesController } from "../src/images/api/images.controller.js";
+import { IngestController } from "../src/ingest/api/ingest.controller.js";
 import { IngestEventsController } from "../src/ingest/api/ingest-events.controller.js";
 import { CATALOG_RECORD_SYNCED_EVENT, IngestEventsService } from "../src/ingest/application/ingest-events.service.js";
+import { IngestService } from "../src/ingest/application/ingest.service.js";
+import { ScanService } from "../src/ingest/application/scan.service.js";
 import { THUMBNAIL_CONTENT_TYPE, createThumbnailBuffer } from "../src/images/application/thumbnail.js";
 import { ImagesService } from "../src/images/application/images.service.js";
 import { ApiExceptionFilter } from "../src/common/http/api-exception.filter.js";
@@ -84,10 +87,12 @@ before(async () => {
   await blobStorage.putThumbnail(record, thumbnailBuffer, THUMBNAIL_CONTENT_TYPE);
 
   @Module({
-    controllers: [HealthController, CatalogController, IngestEventsController, ImagesController],
+    controllers: [HealthController, CatalogController, IngestController, IngestEventsController, ImagesController],
     providers: [
       CatalogService,
       ImagesService,
+      IngestService,
+      ScanService,
       IngestEventsService,
       { provide: CATALOG_REPOSITORY, useValue: catalogRepository },
       { provide: BLOB_STORAGE, useValue: blobStorage },
@@ -205,6 +210,82 @@ test("search endpoint paginates by product rows when productPage is enabled", as
   assert.equal(rowProductNos.size, 20);
 });
 
+test("filebase ingest endpoint stores listed division files and deletes successes", async () => {
+  const inboxDir = path.join(tempDir, "api-inbox");
+  await fs.mkdir(inboxDir, { recursive: true });
+  await writeDivisionPairs(inboxDir, "api-test");
+
+  const response = await fetch(`${baseUrl}/ingest/files`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path: inboxDir, filebase: "api-test" })
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(await response.json(), {
+    success: true,
+    message: "ok",
+    data: { processed: 4, synced: 4, partial: 0, failed: 0, skipped: 0 },
+    errorCode: null,
+    errorMessage: null
+  });
+  assert.equal(await pathExists(path.join(inboxDir, "api-test-top.png")), false);
+  assert.equal(await pathExists(path.join(inboxDir, "api-test-top.json")), false);
+
+  const searchResult = await catalogRepository.search({ productNo: "API-TEST" }, 1, 20);
+  assert.equal(searchResult.total, 4);
+});
+
+test("filebase ingest endpoint emits catalog synced server-sent events", async () => {
+  const inboxDir = path.join(tempDir, "api-events-inbox");
+  await fs.mkdir(inboxDir, { recursive: true });
+  await writeDivisionPairs(inboxDir, "api-events");
+
+  const abort = new AbortController();
+  const eventsResponse = await fetch(`${baseUrl}/images/events`, { signal: abort.signal });
+  assert.equal(eventsResponse.status, 200);
+  const reader = eventsResponse.body?.getReader();
+  assert.ok(reader);
+
+  const ingestResponse = await fetch(`${baseUrl}/ingest/files`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path: inboxDir, filebase: "api-events" })
+  });
+  assert.equal(ingestResponse.status, 201);
+
+  let raw = "";
+  while (!raw.includes(CATALOG_RECORD_SYNCED_EVENT)) {
+    const chunk = await reader.read();
+    assert.equal(chunk.done, false);
+    raw += Buffer.from(chunk.value).toString("utf8");
+  }
+
+  abort.abort();
+  assert.match(raw, new RegExp(`event: ${CATALOG_RECORD_SYNCED_EVENT}`));
+  assert.match(raw, /"imageId":"api-events-top"/);
+});
+
+test("filebase ingest endpoint rejects missing division files", async () => {
+  const inboxDir = path.join(tempDir, "api-missing-inbox");
+  await fs.mkdir(inboxDir, { recursive: true });
+  await writeDivisionPairs(inboxDir, "api-missing");
+  await fs.rm(path.join(inboxDir, "api-missing-bot-inf.json"));
+
+  const response = await fetch(`${baseUrl}/ingest/files`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path: inboxDir, filebase: "api-missing" })
+  });
+
+  assert.equal(response.status, 400);
+  const body = (await response.json()) as { success: boolean; errorCode: string; errorMessage: string };
+  assert.equal(body.success, false);
+  assert.equal(body.errorCode, "VALIDATION_ERROR");
+  assert.match(body.errorMessage, /missing ingest files/);
+  assert.equal(await pathExists(path.join(inboxDir, "api-missing-top.png")), true);
+});
+
 test("stream endpoints stay raw", async () => {
   for (const [suffix, expectedType, expectedBody] of [
     ["/blob", "image/png", seed.imageBuffer],
@@ -269,3 +350,32 @@ test("not-found responses flow through the error envelope", async () => {
 
 const SAMPLE_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8D8WkAAAAASUVORK5CYII=";
+const IMAGE_DIVS = ["top", "bot", "top-inf", "bot-inf"] as const;
+
+async function writeDivisionPairs(rootDir: string, filebase: string): Promise<void> {
+  for (const div of IMAGE_DIVS) {
+    await fs.writeFile(path.join(rootDir, `${filebase}-${div}.png`), Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+    await fs.writeFile(
+      path.join(rootDir, `${filebase}-${div}.json`),
+      JSON.stringify({
+        productId: filebase.toUpperCase(),
+        capturedAt: "2026-04-30T04:00:00.000Z",
+        div,
+        result: "OK",
+        threshold: 0.82,
+        lotNo: "LOT-API",
+        processId: `PROC-${div.toUpperCase()}`,
+        version: "test-v1"
+      })
+    );
+  }
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
