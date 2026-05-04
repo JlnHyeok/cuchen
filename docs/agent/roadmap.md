@@ -1,12 +1,13 @@
 # 프로젝트 로드맵
 
 ## 목표
-이 프로젝트는 MongoDB + MinIO 투트랙 구조를 기준으로 backend와 SvelteKit frontend를 분리 배포한다.
+이 프로젝트는 MongoDB + MinIO 투트랙 구조를 기준으로 backend와 SvelteKit frontend를 분리 실행한다.
 
 ## 총괄 원칙
 - 조회 가능한 메타데이터의 정본은 MongoDB다.
 - 이미지 바이너리의 정본은 MinIO다.
 - 최종 UI 진입점은 `apps/frontend`의 SvelteKit 앱으로 유지하되 backend와는 분리 배포한다.
+- 기본 실행형은 Version A(host/WSL 직접 실행)이고, Docker 실행형은 Version B 보조 선택지다.
 - 계약의 기준은 `docs/` 아래 문서 세트다.
 - 모든 단계는 스텝별 변경 로그와 대화 요약을 남기며 진행한다.
 
@@ -94,13 +95,14 @@
 
 작업:
 - backend와 frontend의 분리 배포 산출물을 정한다.
-- backend는 Docker 스택으로, frontend는 SvelteKit 배포 산출물로 나눈다.
+- Version A는 backend, MongoDB, MinIO를 host/WSL에서 직접 실행하는 기준으로 정한다.
+- Version B는 Docker 스택으로 실행 가능한 보조 배포안으로 정한다.
 - backend URL 주입, 환경설정, 업데이트 흐름을 정한다.
 - 운영자용 backend 산출물과 사용자용 frontend 산출물을 분리한다.
 
 종료 기준:
 - 배포 권고안이 backend / frontend 분리 형태로 하나로 수렴한다.
-- Docker 스택과 SvelteKit 배포 산출물이 서로 충돌하지 않는다.
+- Version A와 Version B의 path 기준이 서로 충돌하지 않는다.
 - 설치기 없이도 각 산출물이 독립적으로 배포 가능하다.
 
 ## 에이전트 책임

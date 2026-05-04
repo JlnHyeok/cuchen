@@ -1,7 +1,7 @@
 # Project Overview
 
 ## 목적
-이미지 파일과 설명 JSON이 한 쌍으로 저장되는 폴더를 감시하고, 자동으로 MongoDB와 MinIO에 적재하는 시스템을 만든다.
+이미지 파일과 설명 JSON이 한 쌍으로 저장되는 폴더 경로를 API로 전달받아 MongoDB와 MinIO에 적재하는 시스템을 만든다.
 
 이 프로젝트의 목적은 다음 네 가지다.
 - 메타데이터 기반 빠른 조회
@@ -13,7 +13,8 @@
 - 새 백엔드 구현은 `apps/backend/`에서 시작한다.
 - 최종 프론트엔드 구현은 `apps/frontend/`의 SvelteKit에서 진행한다.
 - Electron 데스크톱 앱은 `apps/desktop/`에 둔다.
-- Docker 배포 파일은 `infra/docker/`에서 관리한다.
+- 기본 실행형은 Docker 없이 host/WSL에서 backend, MongoDB, MinIO를 직접 실행한다.
+- 추후 Docker 실행형이 필요하면 Docker 배포 파일은 `infra/docker/`에서 관리한다.
 
 ## 아키텍처
 투트랙 구조를 사용한다.
@@ -29,12 +30,16 @@
   - 이미지 표시용 객체 제공
 
 ## 데이터 흐름
-1. 특정 폴더에 `image + json` 쌍이 저장된다.
-2. 백엔드가 폴더 변화를 감지하거나 수동 스캔한다.
+1. 에이전트가 특정 폴더에 `image + json` 쌍을 저장한다.
+2. 에이전트가 backend ingest API에 폴더 경로와 파일 base name을 전달한다.
 3. JSON에서 메타데이터와 태그를 추출한다.
 4. MongoDB에 검색용 문서를 저장한다.
 5. MinIO에 이미지 원본을 저장한다.
 6. 프론트는 backend API를 통해 MongoDB 기준 목록을 조회하고 MinIO 기준 이미지를 본다.
+
+## 실행 버전
+- Version A: host/WSL 직접 실행. 현재 기본값이다. backend는 `/mnt/c/...` 같은 실제 OS 경로를 직접 읽을 수 있다.
+- Version B: Docker 실행 가능형. 추후 배포 선택지이며, ingest `path`는 컨테이너 내부 경로여야 하고 host 경로는 bind mount가 필요하다.
 
 ## 핵심 원칙
 - 메타데이터와 태그는 분리 저장하지 말고 하나의 metadata 문서로 합친다.

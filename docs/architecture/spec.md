@@ -12,6 +12,7 @@
 
 ## 현재 책임
 - 이미지와 JSON 쌍은 basename으로 매칭한다.
+- 에이전트가 `path`와 `filebase`를 전달하면 백엔드는 `{filebase}-{div}.png`와 `{filebase}-{div}.json` 쌍만 ingest한다.
 - JSON은 저장 전에 파싱과 정규화를 거친다.
 - MongoDB는 metadata와 search result를 저장한다.
 - 이미지 바이너리와 원본 JSON, 썸네일은 MinIO에 저장한다.
@@ -28,6 +29,7 @@ raw-json/{imageId}.json
 ## 현재 HTTP 계약
 - `GET /health`
 - `GET /images/buckets`
+- `POST /ingest/files`
 - `POST /ingest/scan`
 - `GET /images/search`
 - `GET /images/:id/metadata`

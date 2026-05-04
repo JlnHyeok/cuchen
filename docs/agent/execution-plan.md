@@ -15,21 +15,21 @@
 - 산출물:
   - metadata schema 초안
   - `imageId`, object key, bucket 규칙
-  - watcher 파이프라인 규칙
+  - API 기반 파일 ingest 파이프라인 규칙
 - 종료 기준:
   - backend와 frontend가 같은 경계를 공유한다.
 
 ### Step A2
-- 폴더 감시 파이프라인 명세 확정
+- API 기반 파일 ingest 파이프라인 명세 확정
 - 산출물:
   - pair 매칭 규칙
   - partial write 정책
   - 삭제/수정 정책
 - 종료 기준:
-  - backend 구현팀이 watcher를 설계할 수 있다.
+  - backend 구현팀이 명시 호출 기반 ingest를 설계할 수 있다.
 
 ### Step A3
-- Docker/배포 경계 검토
+- 실행/배포 경계 검토
 - 산출물:
   - backend, MongoDB, MinIO, frontend의 런타임 경계 문서
 - 종료 기준:
@@ -64,14 +64,14 @@
   - 저장소 계층이 backend에서 분리된다.
 
 ### Step B4
-- 폴더 감시 ingest 구현
+- API 기반 ingest 구현
 - 산출물:
-  - watcher
-  - pair matcher
-  - 안정화 검사
-  - ingest queue
+  - `POST /ingest/files`
+  - `path + filebase` pair matcher
+  - 누락 파일 Bad Request 정책
+  - 성공 삭제와 실패 `failed/` 이동 정책
 - 종료 기준:
-  - 폴더 변경이 자동으로 MongoDB와 MinIO에 반영된다.
+  - 에이전트가 API로 전달한 파일 묶음이 MongoDB와 MinIO에 반영된다.
 
 ### Step B5
 - 목록/검색/상세/다운로드 API 구현
@@ -127,11 +127,11 @@
   - 기본 경로가 끊기지 않는다.
 
 ### Step Q2
-- watcher 기반 E2E 검증
+- API 기반 ingest E2E 검증
 - 산출물:
-  - 폴더 투입 -> MongoDB/MinIO -> UI 표시 시나리오
+  - 파일 생성 -> ingest API 호출 -> MongoDB/MinIO -> UI 표시 시나리오
 - 종료 기준:
-  - 자동 동기화가 재현 가능하다.
+  - 명시 호출 동기화가 재현 가능하다.
 
 ### Step Q3
 - 실패/복구 시나리오 검증
@@ -169,9 +169,10 @@
 ## 7. Deployment / Packaging agent
 
 ### Step D1
-- 분리 배포 구조 확정
+- 두 실행 버전 구조 확정
 - 산출물:
-  - backend Docker 스택
+  - Version A host/WSL 직접 실행 기준
+  - Version B Docker 실행 가능형 기준
   - frontend SvelteKit 배포 기준
   - backend/frontend endpoint 연결 계약
 - 종료 기준:
@@ -182,9 +183,10 @@
 - 산출물:
   - env template
   - MongoDB/MinIO 연결 설정
-  - healthcheck/volume/network 기준
+  - Version A의 host/WSL service 기준
+  - Version B의 healthcheck/volume/network 기준
 - 종료 기준:
-  - backend 스택을 독립적으로 배포할 수 있다.
+  - backend를 Version A로 직접 실행할 수 있고, Version B 전환 조건도 문서화되어 있다.
 
 ### Step D3
 - frontend 배포 연결

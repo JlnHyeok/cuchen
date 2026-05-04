@@ -10,14 +10,16 @@
 - 이 폴더의 기본 역할은 실행 규칙이 아니라 프로젝트 명세, 계획, 리뷰 문서화다.
 
 ## 워크스페이스 기준
-- 실제 구현은 `apps/backend/`, `apps/frontend/`, `apps/desktop/`, `infra/docker/`를 기준으로 진행한다.
+- 실제 구현은 `apps/backend/`, `apps/frontend/`, `apps/desktop/`를 기준으로 진행한다.
+- 기본 실행형은 Docker 없이 host/WSL에서 backend, MongoDB, MinIO를 직접 실행한다.
+- 추후 Docker 실행형이 필요하면 `infra/docker/`를 보조 배포 영역으로 사용한다.
 - `apps/desktop/`은 Electron 데스크톱 앱으로 유지하지만 최종 프론트엔드 방향은 `apps/frontend/`의 SvelteKit이다.
 
 ## 구성
 - `docs/overview.md`: 프로젝트 전체 기획 및 아키텍처
 - `docs/master-plan.md`: 총괄 계획 문서
 - `docs/architecture/spec.md`: 계약과 경계 정의
-- `docs/architecture/folder-sync-pipeline.md`: 폴더 감시 자동 동기화 파이프라인
+- `docs/architecture/folder-sync-pipeline.md`: API 기반 파일 동기화 파이프라인
 - `docs/backend/spec.md`: 백엔드 명세
 - `docs/backend/plan.md`: 백엔드 개발 계획
 - `docs/backend/review.md`: 백엔드 리뷰 관점

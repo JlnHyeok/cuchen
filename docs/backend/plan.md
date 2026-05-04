@@ -3,6 +3,7 @@
 ## 1. 공개 API 정리
 - `/health`
 - `/images/buckets`
+- `/ingest/files`
 - `/ingest/scan`
 - `/images/search`
 - `/images/:imageId`
@@ -18,13 +19,15 @@
 - manifest 기반 search는 제거하고 MongoDB query로 이동한다.
 
 ## 3. ingest 파이프라인
-- 입력 폴더 스캔
-- basename pair matching
+- `path + filebase` 기반 4개 div pair matching
+- 필수 파일 누락 시 Bad Request
 - metadata 정규화
 - `imageId` 생성
 - MongoDB upsert
 - MinIO 원본 저장
 - MinIO 썸네일 저장
+- 성공한 입력 파일 삭제
+- 실패한 pair를 `failed/`로 이동
 - partial write 상태 기록
 
 ## 4. query 경로

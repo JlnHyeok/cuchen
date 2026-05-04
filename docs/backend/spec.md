@@ -9,11 +9,14 @@
 - 프론트는 백엔드 HTTP API만 호출하고, MongoDB나 MinIO에 직접 접근하지 않는다.
 
 ## 런타임 경계
-- 백엔드는 Docker 기반 서비스로 실행한다.
+- 기본 실행형에서 백엔드는 host/WSL Node.js 프로세스로 실행한다.
+- 추후 Docker 실행형도 가능하지만, 이때 `POST /ingest/files`의 `path`는 컨테이너 내부 경로여야 한다.
 - MongoDB는 조회 정본 저장소다.
 - MinIO는 이미지 원본과 썸네일 저장소다.
 - 원본 JSON은 `rawJsonKey`로 저장 위치를 예약해 두었지만, 현재 백엔드 구현은 원본 JSON 객체 업로드까지 수행하지 않는다.
-- ingest 파이프라인은 입력 폴더의 `.png` / `.jpg` / `.json` 쌍을 감시하거나 스캔한다.
+- ingest 파이프라인은 자동 폴더 감시를 하지 않는다.
+- 에이전트가 `path`와 `filebase`를 전달하면 백엔드는 `{filebase}-{div}.png`와 `{filebase}-{div}.json` 쌍만 ingest한다.
+- 기본 실행형에서 `path`는 backend host/WSL 프로세스가 접근 가능한 실제 OS 경로다.
 
 ## 공개 HTTP API
 
@@ -34,6 +37,21 @@
 - 지정한 입력 폴더를 재귀 스캔해 이미지/JSON 쌍을 ingest 한다.
 - 요청 바디
   - `rootDir?`
+- 응답
+  - `processed`
+  - `synced`
+  - `partial`
+  - `failed`
+  - `skipped`
+
+### `POST /ingest/files`
+- 지정한 폴더와 filebase를 기준으로 `top`, `bot`, `top-inf`, `bot-inf` 4개 이미지/JSON 쌍을 ingest 한다.
+- 요청 바디
+  - `path`
+  - `filebase`
+- 일부 파일이 없으면 `400 Bad Request`로 거절하고 ingest를 시작하지 않는다.
+- 성공한 파일은 원본 폴더에서 삭제한다.
+- 실패한 pair는 `failed/` 폴더로 이동한다.
 - 응답
   - `processed`
   - `synced`
@@ -117,13 +135,14 @@ MongoDB는 조회 정본 문서만 저장한다.
 - `metadata.version` 값이 있으면 이미지, 썸네일, metadata JSON 객체의 MinIO user metadata `X-Amz-Meta-Version`에 같은 값을 저장한다.
 
 ## ingest 흐름
-1. 입력 폴더에서 이미지와 JSON을 basename 기준으로 pair 매칭한다.
+1. API로 전달된 `path`와 `filebase`를 기준으로 4개 div pair를 만든다.
 2. JSON을 읽어 metadata를 정규화한다.
 3. `imageId`를 생성한다.
 4. MongoDB에 upsert한다.
 5. 이미지 원본을 MinIO에 저장한다.
 6. 썸네일을 생성해 MinIO에 저장한다.
-7. partial write가 발생하면 상태를 남긴다.
+7. 성공한 입력 파일은 삭제한다.
+8. 실패한 pair는 `failed/` 폴더로 이동하고 상태를 남긴다.
 
 ## 환경 변수
 - `MONGODB_URL`

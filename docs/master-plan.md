@@ -4,9 +4,10 @@
 
 ## 1. 목표
 - `MongoDB + MinIO` 투트랙 구조를 기준으로 새 시스템을 구축한다.
-- `NestJS backend`와 `SvelteKit frontend`를 분리 배포 기준으로 개발한다.
+- `NestJS backend`와 `SvelteKit frontend`를 분리 실행 기준으로 개발한다.
 - 이미지 원본은 MinIO, 목록/검색/메타데이터 정본은 MongoDB로 분리한다.
-- Docker 기반 backend 배포와 SvelteKit 기반 frontend 배포를 분리해서 운영 가능한 형태를 만든다.
+- 기본 실행형은 Docker 없이 host/WSL에서 backend, MongoDB, MinIO를 직접 실행한다.
+- 추후 Docker 실행형도 가능하도록 별도 보조 배포안을 둔다.
 
 ## 2. 구현 기준 구조
 
@@ -17,7 +18,7 @@ apps/
   frontend/     SvelteKit 프론트엔드
   desktop/      Electron 데스크톱 앱
 infra/
-  docker/       Docker Compose, 배포 파일
+  docker/       추후 Docker 실행형 보조 배포 파일
 docs/           명세, 계획, 리뷰, 운영 규칙
 artifacts/      로그, 보고서, 벤치마크 결과
 ```
@@ -40,7 +41,7 @@ artifacts/      로그, 보고서, 벤치마크 결과
 - 필요 시 원본 JSON 또는 export 파일 보관
 
 ### Backend
-- 폴더 감시 또는 수동 스캔
+- API 기반 파일 ingest
 - JSON 정규화
 - MongoDB upsert
 - MinIO put/get
@@ -59,17 +60,19 @@ artifacts/      로그, 보고서, 벤치마크 결과
 - MinIO는 이미지 원본의 단일 정본으로 확정한다.
 - `result`, `aiResult`, `processCode`, `metadata` 필드 규칙을 구현 전에 고정한다.
 - backend와 frontend는 문서화된 HTTP API 계약을 기준으로 연동한다.
-- 배포 기본형은 `backend = Docker`, `frontend = SvelteKit` 분리 배포로 둔다.
-- 폴더 감시 기반 자동 동기화 파이프라인을 backend의 기본 ingest 흐름으로 확정한다.
+- 실행 기본형은 Version A, 즉 host/WSL 직접 실행으로 둔다.
+- Docker 실행형은 Version B 보조 선택지로 둔다.
+- API 기반 파일 동기화 파이프라인을 backend의 기본 ingest 흐름으로 확정한다.
 
-## 4.1 자동 동기화 파이프라인
-- backend는 지정된 입력 폴더를 계속 감시한다.
-- 폴더에는 `.png` 또는 `.jpg`와 `.json`이 같은 basename으로 계속 유입된다.
-- 이미지와 JSON이 모두 도착하고 파일 복사가 완료되면 하나의 pair로 처리한다.
+## 4.1 API 기반 동기화 파이프라인
+- 에이전트가 파일 생성을 완료한 뒤 backend API에 `path`와 `filebase`를 전달한다.
+- backend는 `{filebase}-{div}.png`와 `{filebase}-{div}.json` 4개 div pair만 처리한다.
+- Version A에서 `path`는 backend host/WSL 프로세스가 직접 접근 가능한 실제 OS 경로다.
+- Version B에서 `path`는 컨테이너 내부 경로이며, host 경로는 bind mount가 필요하다.
 - JSON에서 metadata를 정규화하고 MongoDB에 upsert한다.
 - 이미지 원본은 MinIO에 저장한다.
 - MongoDB 성공 / MinIO 실패 또는 그 반대의 경우는 partial write로 기록한다.
-- 삭제와 수정 이벤트는 별도 정책으로 관리하고, 기본은 soft-sync다.
+- 성공한 입력 파일은 삭제하고, 실패한 pair는 `failed/` 폴더로 이동한다.
 - 상세 규칙은 `docs/architecture/folder-sync-pipeline.md`를 따른다.
 
 ## 5. 단계별 개발 계획
@@ -89,11 +92,11 @@ artifacts/      로그, 보고서, 벤치마크 결과
   - `SearchModule`
   - `StorageModule`
 - 종료 기준:
-  - `/health`, `/images`, `/images/:id`, `/images/:id/metadata`, `/images/:id/download`, `/ingest/scan`의 기본 뼈대가 준비된다.
+  - `/health`, `/images`, `/images/:id`, `/images/:id/metadata`, `/images/:id/download`, `/ingest/files`의 기본 뼈대가 준비된다.
 
 ### Phase 2. 저장소 계층
 - MongoDB repository와 MinIO adapter를 분리한다.
-- ingest는 `watch/scan -> pair match -> stabilize -> parse -> normalize -> MongoDB upsert -> MinIO put` 순서로 오케스트레이션한다.
+- ingest는 `API call -> path/filebase pair match -> parse -> normalize -> MongoDB upsert -> MinIO put` 순서로 오케스트레이션한다.
 - partial write와 idempotency를 설계한다.
 - 종료 기준:
   - 같은 `imageId` 기준으로 MongoDB와 MinIO에 일관되게 저장된다.
@@ -152,16 +155,12 @@ artifacts/      로그, 보고서, 벤치마크 결과
   - p50/p95가 기록된다.
   - 병목이 MongoDB, MinIO, backend, frontend 중 어디인지 추적 가능하다.
 
-### Phase 8. Docker 배포
-- `infra/docker`에 Docker Compose를 만든다.
-- 포함 대상:
-  - backend
-  - MongoDB
-  - MinIO
-  - 필요 시 reverse proxy
+### Phase 8. 실행/배포 버전 정리
+- Version A host/WSL 직접 실행 절차를 확정한다.
+- Version B Docker 실행 가능형을 보조 배포안으로 정리한다.
 - 종료 기준:
-  - `docker compose up`으로 스택이 올라간다.
-  - healthcheck와 volume이 포함된다.
+  - Version A에서 backend, MongoDB, MinIO가 Docker 없이 실행된다.
+  - Version B에서 Docker 스택과 bind mount 조건이 문서화된다.
 
 ## 6. 하위 에이전트별 책임
 
@@ -202,7 +201,7 @@ artifacts/      로그, 보고서, 벤치마크 결과
 - 게이트 통과 여부 판단
 
 ### Deployment / Packaging agent
-- backend / frontend 분리 배포 구조
+- backend / frontend 분리 실행 구조
 - 환경 변수 주입
 - 배포 산출물과 패키징 기준
 
@@ -229,10 +228,10 @@ artifacts/      로그, 보고서, 벤치마크 결과
 1. `apps/backend` NestJS skeleton 작성
 2. MongoDB/MinIO 저장 계약 문서 확정
 3. `apps/frontend` SvelteKit UI 정리
-4. Docker Compose 초안 작성
+4. Version A 실행 절차와 Version B Docker 보조안을 문서화
 
 ## 9. 주요 리스크
 - MongoDB와 MinIO 사이의 상태 불일치
 - HTTP API 계약 없이 backend와 frontend가 따로 진화하는 문제
 - 25,000건에서 frontend가 전체 데이터를 들고 있어 느려지는 문제
-- Docker로 backend 스택을 묶었지만 frontend 연결이 복잡해지는 문제
+- Version A와 Version B의 path 기준이 섞이는 문제

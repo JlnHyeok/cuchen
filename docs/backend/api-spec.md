@@ -2,7 +2,10 @@
 
 버전: `v0.2`
 대상: `NestJS 백엔드`
-배포 형태: `프론트 / 백엔드 분리 배포`
+배포 형태: `프론트 / 백엔드 분리 실행`
+
+- Version A: host/WSL 직접 실행. 현재 기본값이다.
+- Version B: Docker 실행 가능형. 추후 보조 선택지다.
 
 ## 1. 목적
 
@@ -78,6 +81,7 @@
 | --- | --- | --- |
 | `GET` | `/health` | 현재 설정과 실행 상태 확인 |
 | `GET` | `/images/buckets` | 접근 가능한 MinIO 버킷 목록 조회 |
+| `POST` | `/ingest/files` | 지정 filebase의 4개 div 이미지/JSON 쌍 동기화 |
 | `POST` | `/ingest/scan` | 입력 폴더 재귀 스캔 및 MongoDB/MinIO 동기화 |
 | `GET` | `/images/search` | MongoDB 기반 목록 조회 및 필터 검색 |
 | `GET` | `/images/:imageId/metadata` | 정규화 레코드 조회 |
@@ -101,7 +105,7 @@ MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.ve
 | --- | --- | --- |
 | `ok` | `boolean` | 서버 응답 가능 여부 |
 | `storageMode` | `string` | 현재 저장 모드 |
-| `ingestRootDir` | `string` | 감시 루트 경로 |
+| `ingestRootDir` | `string` | 기본 ingest 입력 경로 |
 | `minioEndpoint` | `string` | MinIO 연결 주소 |
 | `bucket` | `string` | 기본 버킷명 |
 
@@ -121,7 +125,43 @@ MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.ve
 | --- | --- | --- |
 | `buckets` | `Array<string>` | 버킷 목록 |
 
-### 4.3 `POST /ingest/scan`
+### 4.3 `POST /ingest/files`
+
+에이전트가 생성한 파일 묶음을 명시적으로 동기화한다. 백엔드는 폴더 전체를 감시하지 않고, 요청받은 `path`와 `filebase`로 아래 4개 div pair만 처리한다.
+
+Version A에서 `path`는 backend host/WSL 프로세스가 접근 가능한 실제 OS 경로다. Version B에서 `path`는 컨테이너 내부 경로이며, host 경로를 쓰려면 Docker bind mount가 필요하다.
+
+```text
+{path}/{filebase}-top.png
+{path}/{filebase}-top.json
+{path}/{filebase}-bot.png
+{path}/{filebase}-bot.json
+{path}/{filebase}-top-inf.png
+{path}/{filebase}-top-inf.json
+{path}/{filebase}-bot-inf.png
+{path}/{filebase}-bot-inf.json
+```
+
+#### 요청 바디
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `path` | `string` | `Y` | 입력 파일이 있는 폴더 |
+| `filebase` | `string` | `Y` | div suffix 앞의 파일 base name |
+
+#### 응답 데이터
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `processed` | `number` | 처리한 pair 수 |
+| `synced` | `number` | 동기화 성공 수 |
+| `partial` | `number` | 부분 성공 수 |
+| `failed` | `number` | 실패 수 |
+| `skipped` | `number` | 건너뛴 pair 수 |
+
+4개 div pair 중 일부 파일이 없으면 `400 Bad Request`로 거절하고 ingest를 시작하지 않는다. 성공한 입력 파일은 삭제하고, 실패한 pair는 `failed/` 폴더로 이동한다.
+
+### 4.4 `POST /ingest/scan`
 
 입력 폴더를 재귀적으로 스캔해서 이미지와 JSON pair를 동기화한다.
 
@@ -141,7 +181,7 @@ MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.ve
 | `failed` | `number` | 실패 수 |
 | `skipped` | `number` | 건너뛴 pair 수 |
 
-### 4.4 `GET /images/search`
+### 4.5 `GET /images/search`
 
 MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 
@@ -176,7 +216,7 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 | `pageSize` | `number` | 페이지 크기 |
 | `items` | `Array<CatalogRecord>` | 목록 항목 |
 
-### 4.5 `GET /images/:imageId/metadata`
+### 4.6 `GET /images/:imageId/metadata`
 
 선택한 이미지의 정규화 레코드를 반환한다.
 
@@ -199,11 +239,11 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 | `createdAt` | `string` | 생성일 |
 | `updatedAt` | `string` | 수정일 |
 
-### 4.6 `GET /images/:imageId`
+### 4.7 `GET /images/:imageId`
 
 단건 레코드 조회다. 응답 형태는 `/images/:imageId/metadata`와 동일하다.
 
-### 4.7 `GET /images/:imageId/blob`
+### 4.8 `GET /images/:imageId/blob`
 
 원본 이미지를 스트리밍으로 반환한다.
 
@@ -211,7 +251,7 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 
 - `Content-Type`
 
-### 4.8 `GET /images/:imageId/thumbnail`
+### 4.9 `GET /images/:imageId/thumbnail`
 
 썸네일 이미지를 스트리밍으로 반환한다.
 
@@ -220,7 +260,7 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 - `Content-Type`
 - `Cache-Control`
 
-### 4.9 `GET /images/:imageId/download`
+### 4.10 `GET /images/:imageId/download`
 
 파일 저장용 원본 이미지를 반환한다.
 
@@ -229,7 +269,7 @@ MongoDB를 기준으로 목록 조회와 필터 검색을 수행한다.
 - `Content-Type`
 - `Content-Disposition`
 
-### 4.10 `GET /images/events`
+### 4.11 `GET /images/events`
 
 catalog 변경 이벤트를 Server-Sent Events 형식으로 스트리밍한다.
 
@@ -289,10 +329,11 @@ catalog 변경 이벤트를 Server-Sent Events 형식으로 스트리밍한다.
 
 ## 6. ingest 순서
 
-1. 입력 폴더에서 이미지와 JSON을 basename 기준으로 pair 매칭한다.
+1. `POST /ingest/files`는 API로 전달된 `path`와 `filebase`를 기준으로 4개 div pair를 만든다.
 2. JSON을 읽어 metadata를 정규화한다.
 3. `imageId`를 생성한다.
 4. MongoDB에 upsert 한다.
 5. 이미지 원본을 MinIO에 저장한다.
 6. 썸네일을 생성해 MinIO에 저장한다.
-7. 부분 실패가 발생하면 상태를 남긴다.
+7. 성공한 입력 파일은 삭제한다.
+8. 실패한 pair는 `failed/` 폴더로 이동하고 상태를 남긴다.
