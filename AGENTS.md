@@ -38,8 +38,12 @@
 - `apps/backend/`: NestJS 백엔드
 - `apps/frontend/`: SvelteKit 최종 사용자 UI
 - `apps/desktop/`: Electron 데스크톱 앱
-- `infra/docker/`: MongoDB, MinIO, backend 실행 인프라
+- `infra/docker/`: 추후 Docker 실행형이 필요할 때 사용하는 보조 배포 영역
 - `docs/`: 명세, 계획, 리뷰, 에이전트 운영 문서
+
+## 실행 버전
+- Version A: host/WSL 직접 실행. 현재 기본 기준이며 backend, MongoDB, MinIO를 Docker 없이 실행한다.
+- Version B: Docker 실행 가능형. 추후 선택지이며, `POST /ingest/files`의 `path`는 컨테이너 내부 경로여야 하고 host 경로는 bind mount가 필요하다.
 
 ## 구현 경계
 - MongoDB는 목록, 필터, 메타데이터 조회의 정본이다.
@@ -52,5 +56,5 @@
 - backend 변경: `cd apps/backend && npm run test`
 - frontend 변경: `cd apps/frontend && npm test && npm run check && npm run build`
 - desktop 변경: `cd apps/desktop && npm run test`
-- docker 변경: `cd infra/docker && docker compose --env-file .env config`
+- docker 변경: `cd infra/docker && docker compose --env-file .env config` (Version B 관련 변경 시)
 - 문서만 변경한 경우에는 실행 검증 대신 변경 이유와 동기화 범위를 남긴다.

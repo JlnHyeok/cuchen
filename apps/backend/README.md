@@ -15,7 +15,7 @@
 ## 실행
 - `npm run dev`
   - shared를 먼저 빌드한 뒤 backend를 실행한다.
-  - MongoDB / MinIO 실연동이 필요하면 먼저 `cd ../../infra/docker && docker compose --env-file .env up -d`를 실행한다.
+  - MongoDB / MinIO 실연동 설치와 배포 절차는 `../../docs/deployment/no-docker-install.md`를 따른다.
   - backend는 실행 시 `apps/backend/.env`를 자동으로 읽고, 시작 로그에 `storageMode`를 출력한다.
 - `npm run test`
   - ingest service memory test를 실행한다.
@@ -42,18 +42,18 @@
 2. `STORAGE_MODE=memory`로 둔다.
 3. `npm run dev`
 
-### 원격 MongoDB / MinIO 실연동 모드
-현재 운영/개발 연결 기준이다.
+### MongoDB / MinIO 실연동 모드
+Docker 없이 설치한 MongoDB / MinIO 또는 원격 MongoDB / MinIO를 연결할 때 사용한다.
 
 1. `apps/backend/.env`에 아래 값을 넣는다.
-   - `MINIO_ENDPOINT=http://192.168.1.92:9000`
-   - `MINIO_ACCESS_KEY=roylabs`
-   - `MINIO_SECRET_KEY=roylabs0531!`
-   - `MINIO_BUCKET=jin-test`
-   - `MONGODB_URL=mongodb://192.168.1.92:27017`
+   - `MINIO_ENDPOINT=http://127.0.0.1:9000`
+   - `MINIO_ACCESS_KEY=<minio-access-key>`
+   - `MINIO_SECRET_KEY=<minio-secret-key>`
+   - `MINIO_BUCKET=cuchen-images`
+   - `MONGODB_URL=mongodb://127.0.0.1:27017`
    - `MONGODB_DATABASE_NAME=cuchen`
-   - `MONGODB_USER=roylabs`
-   - `MONGODB_PASSWORD=roylabs0531!`
+   - `MONGODB_USER=<mongodb-user>`
+   - `MONGODB_PASSWORD=<mongodb-password>`
 2. `STORAGE_MODE=mongo-minio`로 둔다.
 3. `npm run dev`
 4. backend가 시작되면 MongoDB에 collection을 먼저 생성하고, ingest가 들어오면 문서가 쌓인다.
@@ -79,10 +79,5 @@ MinIO에 이미 데이터가 있고 MongoDB가 비어 있거나 어긋난 경우
 2. `npm run sync:prune-metadata-columns`
 3. 이후 `npm run dev` 또는 `npm run sync:reconcile-minio-mongo`를 실행한다.
 
-### Docker로 MongoDB / MinIO를 띄우는 경우
-로컬 컨테이너를 사용할 때만 아래 순서를 따른다.
-
-1. `cd ../../infra/docker`
-2. `.env.example`을 복사해서 `.env`를 준비한다.
-3. `docker compose --env-file .env up -d`
-4. 다시 `cd ../../apps/backend && npm run dev`
+### 배포 문서
+Ubuntu/Windows에서 Docker 없이 MongoDB, MinIO, backend, frontend를 설치/배포하는 절차는 `../../docs/deployment/no-docker-install.md`를 따른다.
