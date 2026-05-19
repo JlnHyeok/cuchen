@@ -131,6 +131,36 @@ test("scanAndIngest walks nested directories", async () => {
   assert.equal(secondOutcome.synced, 0);
 });
 
+test("scanAndIngest ingests jpg image and json pairs", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-scan-jpg-"));
+  await fs.writeFile(path.join(rootDir, "sample.jpg"), Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+  await fs.writeFile(
+    path.join(rootDir, "sample.json"),
+    JSON.stringify({
+      productId: "PRD-JPG-001",
+      capturedAt: "2026-04-21T10:30:00.000Z",
+      div: "top",
+      result: "OK",
+      threshold: 0.12
+    })
+  );
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const outcome = await service.scanAndIngest(rootDir);
+
+  assert.equal(outcome.processed, 1);
+  assert.equal(outcome.synced, 1);
+  assert.equal(await pathExists(path.join(rootDir, "sample.jpg")), false);
+
+  const searchResult = await catalog.search({ productNo: "PRD-JPG-001" }, 1, 20);
+  assert.equal(searchResult.total, 1);
+  assert.equal(searchResult.items[0]?.fileExt, "jpg");
+});
+
 test("scanAndIngest moves failed pairs into failed directory", async () => {
   const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-failed-"));
   const imagePath = path.join(rootDir, "bad.png");
@@ -179,6 +209,28 @@ test("ingestFilebase stores four division pairs and deletes successful files", a
   assert.equal(searchResult.total, 4);
 });
 
+test("ingestFilebase stores jpg division pairs", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-jpg-"));
+  await writeDivisionPairs(rootDir, "cuchen-test", ".jpg");
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+  const outcome = await service.ingestFilebase(rootDir, "cuchen-test");
+
+  assert.deepEqual(outcome, { processed: 4, synced: 4, partial: 0, failed: 0, skipped: 0 });
+  for (const div of IMAGE_DIVS) {
+    assert.equal(await pathExists(path.join(rootDir, `cuchen-test-${div}.jpg`)), false);
+    assert.equal(await pathExists(path.join(rootDir, `cuchen-test-${div}.json`)), false);
+  }
+
+  const searchResult = await catalog.search({ productNo: "CUCHEN-TEST" }, 1, 20);
+  assert.equal(searchResult.total, 4);
+  assert.deepEqual([...new Set(searchResult.items.map((item) => item.fileExt))], ["jpg"]);
+});
+
 test("ingestFilebase rejects missing division files before ingesting", async () => {
   const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-missing-"));
   await writeDivisionPairs(rootDir, "cuchen-test");
@@ -194,6 +246,20 @@ test("ingestFilebase rejects missing division files before ingesting", async () 
   assert.equal((await catalog.search({ productNo: "CUCHEN-TEST" }, 1, 20)).total, 0);
   assert.equal(await pathExists(path.join(rootDir, "cuchen-test-top.png")), true);
   assert.equal(await pathExists(path.join(rootDir, "failed")), false);
+});
+
+test("ingestFilebase missing image message lists supported image extensions", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "cuchen-backend-filebase-missing-image-"));
+  await writeDivisionPairs(rootDir, "cuchen-test");
+  await fs.rm(path.join(rootDir, "cuchen-test-bot.png"));
+
+  const catalog = new MemoryCatalogRepository();
+  const blob = new MemoryBlobStorage();
+  await catalog.init();
+  await blob.init();
+  const service = new IngestService(catalog, blob);
+
+  await assert.rejects(() => service.ingestFilebase(rootDir, "cuchen-test"), /\.png\/\.jpg\/\.jpeg/);
 });
 
 test("ingestFilebase moves failed pairs into failed directory", async () => {
@@ -503,9 +569,9 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
-async function writeDivisionPairs(rootDir: string, filebase: string): Promise<void> {
+async function writeDivisionPairs(rootDir: string, filebase: string, imageExt = ".png"): Promise<void> {
   for (const div of IMAGE_DIVS) {
-    await fs.writeFile(path.join(rootDir, `${filebase}-${div}.png`), Buffer.from(SAMPLE_PNG_BASE64, "base64"));
+    await fs.writeFile(path.join(rootDir, `${filebase}-${div}${imageExt}`), Buffer.from(SAMPLE_PNG_BASE64, "base64"));
     await fs.writeFile(
       path.join(rootDir, `${filebase}-${div}.json`),
       JSON.stringify({

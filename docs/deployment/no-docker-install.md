@@ -423,7 +423,7 @@ npm run preview -- --host 0.0.0.0 --port 4173
 - frontend origin이 backend `CORS_ORIGIN`에 포함되어 있다.
 
 ### ingest
-- agent가 생성한 파일명이 `filebase-{div}.json`, `filebase-{div}.png` 형태다.
+- agent가 생성한 파일명이 `filebase-{div}.json`, `filebase-{div}.{png|jpg|jpeg}` 형태다.
 - `POST /ingest/files` 요청의 `path`는 backend 프로세스가 접근 가능한 실제 경로다.
 - 성공 시 원본 파일이 삭제된다.
 - 실패 시 원본 파일이 `failed/` 폴더로 이동한다.

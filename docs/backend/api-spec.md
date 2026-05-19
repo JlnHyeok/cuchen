@@ -132,13 +132,13 @@ MinIO에 저장되는 이미지, 썸네일, metadata JSON 객체는 `metadata.ve
 Version A에서 `path`는 backend host/WSL 프로세스가 접근 가능한 실제 OS 경로다. Version B에서 `path`는 컨테이너 내부 경로이며, host 경로를 쓰려면 Docker bind mount가 필요하다.
 
 ```text
-{path}/{filebase}-top.png
+{path}/{filebase}-top.{png|jpg|jpeg}
 {path}/{filebase}-top.json
-{path}/{filebase}-bot.png
+{path}/{filebase}-bot.{png|jpg|jpeg}
 {path}/{filebase}-bot.json
-{path}/{filebase}-top-inf.png
+{path}/{filebase}-top-inf.{png|jpg|jpeg}
 {path}/{filebase}-top-inf.json
-{path}/{filebase}-bot-inf.png
+{path}/{filebase}-bot-inf.{png|jpg|jpeg}
 {path}/{filebase}-bot-inf.json
 ```
 

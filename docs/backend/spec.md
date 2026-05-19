@@ -15,7 +15,7 @@
 - MinIO는 이미지 원본과 썸네일 저장소다.
 - 원본 JSON은 `rawJsonKey`로 저장 위치를 예약해 두었지만, 현재 백엔드 구현은 원본 JSON 객체 업로드까지 수행하지 않는다.
 - ingest 파이프라인은 자동 폴더 감시를 하지 않는다.
-- 에이전트가 `path`와 `filebase`를 전달하면 백엔드는 `{filebase}-{div}.png`와 `{filebase}-{div}.json` 쌍만 ingest한다.
+- 에이전트가 `path`와 `filebase`를 전달하면 백엔드는 `{filebase}-{div}.{png|jpg|jpeg}`와 `{filebase}-{div}.json` 쌍만 ingest한다.
 - 기본 실행형에서 `path`는 backend host/WSL 프로세스가 접근 가능한 실제 OS 경로다.
 
 ## 공개 HTTP API

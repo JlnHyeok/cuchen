@@ -21,6 +21,8 @@ interface PairCandidate {
 }
 
 const IMAGE_DIVS = ["top", "bot", "top-inf", "bot-inf"] as const;
+const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg"];
+const SUPPORTED_IMAGE_EXTENSIONS_LABEL = SUPPORTED_IMAGE_EXTENSIONS.join("/");
 const ARCHIVE_DIR_NAMES = new Set(["processed", "failed"]);
 
 @Injectable()
@@ -174,7 +176,7 @@ async function collectFilebasePairs(rootDir: string, filebase: string): Promise<
     const jsonPath = `${base}.json`;
     const hasJson = await pathExists(jsonPath);
     if (!imagePath) {
-      missing.push(`${relativeKey}.png`);
+      missing.push(`${relativeKey} image (${SUPPORTED_IMAGE_EXTENSIONS_LABEL})`);
     }
     if (!hasJson) {
       missing.push(`${relativeKey}.json`);
@@ -203,7 +205,7 @@ function collectPairs(rootDir: string, files: string[]): PairCandidate[] {
   for (const filePath of files) {
     if (isArchivePath(rootDir, filePath)) continue;
     const ext = path.extname(filePath).toLowerCase();
-    if (![".png", ".jpg", ".jpeg", ".json"].includes(ext)) continue;
+    if (![...SUPPORTED_IMAGE_EXTENSIONS, ".json"].includes(ext)) continue;
     const key = path.relative(rootDir, filePath).slice(0, -ext.length);
     const entry = map.get(key) ?? {};
     if (ext === ".json") {
@@ -265,7 +267,7 @@ function detectMimeType(ext: string): string {
 }
 
 async function findExistingImage(base: string): Promise<string | null> {
-  for (const ext of [".png", ".jpg", ".jpeg"]) {
+  for (const ext of SUPPORTED_IMAGE_EXTENSIONS) {
     const candidate = `${base}${ext}`;
     try {
       await fs.access(candidate);

@@ -66,7 +66,7 @@ artifacts/      로그, 보고서, 벤치마크 결과
 
 ## 4.1 API 기반 동기화 파이프라인
 - 에이전트가 파일 생성을 완료한 뒤 backend API에 `path`와 `filebase`를 전달한다.
-- backend는 `{filebase}-{div}.png`와 `{filebase}-{div}.json` 4개 div pair만 처리한다.
+- backend는 `{filebase}-{div}.{png|jpg|jpeg}`와 `{filebase}-{div}.json` 4개 div pair만 처리한다.
 - Version A에서 `path`는 backend host/WSL 프로세스가 직접 접근 가능한 실제 OS 경로다.
 - Version B에서 `path`는 컨테이너 내부 경로이며, host 경로는 bind mount가 필요하다.
 - JSON에서 metadata를 정규화하고 MongoDB에 upsert한다.
